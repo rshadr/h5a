@@ -1,0 +1,8 @@
+build/
+*.o
+*.d
+*.a
+*.core
+*.vgcore
+massif.out.*
+perf.*
