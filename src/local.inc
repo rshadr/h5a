@@ -49,4 +49,6 @@ struct H5aParser
 
 ends
 
-
+DATA_STATE_INDEX equ 1
+TAG_OPEN_STATE_INDEX equ 2
+CHAR_REF_STATE_INDEX equ 3

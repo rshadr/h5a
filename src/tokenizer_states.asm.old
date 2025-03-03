@@ -1,0 +1,44 @@
+format ELF64
+
+include 'macro/struct.inc'
+include "util.inc"
+include "local.inc"
+
+
+macro define_state name*,state_index_pfx*
+  state_index = `state_index_pfx + "_STATE"
+
+  macro when
+  end macro
+
+  macro end?.when!
+  end macro
+
+  macro switch
+  end macro
+
+  macro end?.switch!
+  end macro
+
+  macro end?.define_state!
+  ;; XXX: remove duplicate labels
+  ;; virtual assembly??
+  end macro
+
+end macro
+
+
+
+section '.text' executable
+
+define_state data,DATA
+  when
+  end when
+
+  switch
+    anything_else => {
+      xor eax,eax
+      ret
+    }
+  end switch
+end define_state

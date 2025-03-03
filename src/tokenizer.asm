@@ -24,10 +24,10 @@ public _h5a_Tokenizer_main
 
 section '.rodata'
 _k_h5a_Tokenizer_common_handler_table:
-  ;; Heterogenous table table
-  dq _k_h5a_Tokenizer_ascii_matrix
-  dq _k_h5a_Tokenizer_unicode_table
-  dq _k_h5a_Tokenizer_eof_table
+  ;; Heterogenous table
+  dq _k_h5a_Tokenizer_ascii_matrix ;2d
+  dq _k_h5a_Tokenizer_unicode_table ;1d
+  dq _k_h5a_Tokenizer_eof_table ;1d
 
 
 section '.text' executable
@@ -103,7 +103,7 @@ _h5a_Tokenizer_main:
       lea   rbx, [_k_h5a_Tokenizer_common_handler_table]
       mov   rbx, qword [rbx + rax * 8]
 
-      test  rax,rax
+      test  rax,rax ;unicode/EOF?
       UNLIKELY jnz .charLoop.unicodeOrEofLoop
 
     .charLoop.asciiLoop:

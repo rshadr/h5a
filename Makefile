@@ -9,6 +9,7 @@ include config.mk
 
 SOURCES =\
 	tokenizer\
+	tokenizer_states\
 	treebuilder
 
 OBJS = $(patsubst %, build/%.o, $(SOURCES))
