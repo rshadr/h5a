@@ -24,7 +24,7 @@ build/libh5a.a: $(OBJS)
 
 build/%.o: src/%.asm
 	@mkdir -p $(@D)
-	$(FASM2) $< $@
+	$(FASM2) -v 2 $< $@
 
 clean:
 	rm -rf build

@@ -48,10 +48,33 @@ _h5a_Tokenizer_eatInsensitive:
 
 _h5a_Tokenizer_emitToken:
 ;; R12 (s): H5aParser *parser
-;; RDI (arg): u64 ?
-;; -> RAX: u32 result
+;; RDI (arg): opaque64 data
+;; RSI (arg): enum type
+;; -> void
   lea  rax, [_h5a_TreeBuilder_acceptToken]
   jmp  rax
+
+_h5a_Tokenizer_emitCharacter:
+;; R12 (s): H5aParser *parser
+;; EDI (arg): u32 code
+;; -> void
+  xor rsi,rsi
+  mov sil, TOKEN_CHARACTER
+  jmp _h5a_Tokenizer_emitToken
+
+
+_h5a_Tokenizer_emitTag:
+;; R12 (s): H5aParser *parser
+;; -> void
+  jmp _h5a_Tokenizer_emitToken
+
+_h5a_Tokenizer_emitEof:
+  ;; R12 (s): H5aParser *parser
+  ;; -> u8 status
+  mov sil, TOKEN_EOF
+  call _h5a_Tokenizer_emitToken
+  mov al, RESULT_EOF_REACHED
+  ret
 
 _h5a_Tokenizer_main:
   ;; R12 (s/lost): H5aParser *
@@ -82,9 +105,9 @@ _h5a_Tokenizer_main:
       mov   r10, rax ;keep for later
     
     .charLoop.hashChar:
-      ;; hash result (al):
+      ;; hash result (AL):
       ;;  0x00 : ASCII codepoint   (< 0x007F)
-      ;;  0x01 : Unicode codepoint (> 0x007F && != ~0x00)
+      ;;  0x01 : Unicode codepoint (> 0x007F and != ~0x00)
       ;;  0x02 : EOF               (== ~0x00)
       xor    rax,rax
       xor    rdi,rdi

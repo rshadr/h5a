@@ -28,6 +28,22 @@ RESULT_STOP         equ (RESULT_BIT_CLEANUP or RESULT_BIT_LEAVE) + 0x1
 STATE_BIT_SPC_ACTION equ 1 shl 0
 STATE_BIT_NO_GETCHAR equ 1 shl 1
 
+enum
+  TOKEN_CHARACTER,
+  TOKEN_WHITESPACE,
+  TOKEN_DOCTYPE,
+  TOKEN_START_TAG,
+  TOKEN_END_TAG,
+  TOKEN_COMMENT,
+  TOKEN_EOF,
+end enum
+
+enum
+  DATA_STATE,
+  TAG_OPEN_STATE,
+  MARKUP_DECLARATION_OPEN_STATE,
+end enum
+
 
 struct H5aParserCreateInfo
   get_char dq ?
@@ -48,7 +64,3 @@ struct H5aParser
   tokenizer.char_ref dq ?
 
 ends
-
-DATA_STATE_INDEX equ 1
-TAG_OPEN_STATE_INDEX equ 2
-CHAR_REF_STATE_INDEX equ 3
