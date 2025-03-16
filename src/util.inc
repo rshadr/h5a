@@ -18,9 +18,9 @@ macro enum
 
     match =end? =enum?, line
     jyes done
-    match name == val=,, line
+    match name == val, line
     jyes explicit_val
-    match name =,, line
+    match name , line
     jyes implicit_val
 
     err 'Invalid enum body form'
@@ -44,3 +44,5 @@ macro enum
       exit
   end calminstruction
 end macro
+
+assert defined DATA_STATE

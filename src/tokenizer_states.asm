@@ -10,7 +10,13 @@ extrn _h5a_Tokenizer_eatInsensitive
 
 section '.text' executable
 
-define_state data
+;; Dummy handler for development
+_h5a_Tokenizer_handle.DUMMY.any:
+  ;; XXX: error call?
+  xor al,al
+  ret
+
+define_state data,DATA_STATE
   [[U+0026 AMPERSAND (&)]]
     ; store
     ; switch
@@ -29,7 +35,7 @@ define_state data
     ret
 end define_state
 
-define_state tagOpen
+define_state tagOpen,TAG_OPEN_STATE
   [[U+0021 EXCLAMATION MARK (!)]]
     ; switch
     xor al,al
@@ -59,7 +65,7 @@ end define_state
 
 ; ...
 
-define_state markupDeclarationOpen
+define_state markupDeclarationOpen,MARKUP_DECLARATION_OPEN_STATE
   [[Exactly "--"]]
     xor al,al
     ;[[fallthrough]]
@@ -77,5 +83,5 @@ end define_state
 
 
 section '.rodata'
-
+generate_tables
 

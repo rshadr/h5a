@@ -1,11 +1,16 @@
-macro define_state anchor*
-;;
-;; DESCRIPTION
-;;
-;; This comically large macro implements the custom syntax for tokenizer state
-;; handlers. Refer to tokenizer_states.asm for an example. It is quite
-;; straightforward and resembles a lot the official spec.
-;;
+;;;;
+;;;; Copyright 2025 rshadr
+;;;; See LICENSE for details
+;;;;
+;;;; This file implements the custom syntax for tokenizer state handlers.
+;;;; See https://board.flatassembler.net/topic.php?t=23762 for discussion.
+;;;;
+
+
+macro define_state anchor*,index*
+;;;
+;;; Custom syntax
+;;;
   local prefix, beyond_index, in_seq, have_any
   prefix equ _h5a_Tokenizer_handle.anchor
   beyond_index = 0
@@ -74,7 +79,7 @@ macro define_state anchor*
     assemble var
 
     ;; RDI is used here because it has no meaning yet.
-    ;; It _MAY_ later hold uint32_t charcode, but that
+    ;; It *may* later hold uint32_t charcode, but that
     ;; will inevitably be after the string cases.
     arrange var, =lea =rdi, =[seq_label=]
     assemble var
@@ -220,7 +225,12 @@ macro define_state anchor*
       check have_any
       jno no_any
 
-      arrange var, =purge ?, =char_range, =seq_store, =seq_match, =seq_maybe_beyond
+      compute val, index
+      arrange var, =anchorForIndex.index
+      arrange anchor, anchor ;why on earth this line?
+      publish var:, anchor
+
+      arrange var, =purge ?, =remember_anchor, =char_range, =seq_store, =seq_match, =seq_maybe_beyond
       assemble var
       exit
 
@@ -229,4 +239,116 @@ macro define_state anchor*
       exit
   end calminstruction
 end macro
+
+
+macro generate_tables
+;;
+;; Postpone or put at back of file. Preferrably '.rodata' section.
+;;
+  local prefix
+
+  calminstruction get_prefix index*
+    local var, val
+    arrange var, =anchorForIndex.index
+    transform var
+    jno no_compensate
+      arrange var, =DUMMY
+    no_compensate:
+      arrange prefix, =_h5a_Tokenizer_handle.var
+      exit
+
+    missing_state_def:
+      err 'Missing state definition'
+      exit
+  end calminstruction
+
+
+  calminstruction gen_ascii
+    local var
+    local i, j
+    compute i, 0
+
+    state_loop:
+      check i < NUM_STATES
+      jno done
+      call get_prefix, i
+
+      compute j, 0
+      char_loop:
+        check j <= 0x7F
+        jno char_loop_post
+
+        arrange var, prefix.j
+        check defined var
+        jyes explicit
+          arrange var, prefix.=any
+        explicit:
+          arrange var, =dq var
+          assemble var
+          compute j, j + 1
+          jump char_loop
+
+    char_loop_post:
+      compute i, i + 1
+      jump state_loop
+
+    done:
+      exit
+  end calminstruction
+
+  calminstruction gen_unicode
+    local var
+    local i
+    compute i, 0
+
+    state_loop:
+      check i < NUM_STATES
+      jno done
+      call get_prefix, i
+
+      arrange var, prefix.=eof
+      check defined var
+      jyes explicit
+        arrange var, prefix.=any
+      explicit:
+        arrange var, =dq var
+        assemble var
+        compute i, i + 1
+        jump state_loop
+
+    done:
+      exit
+  end calminstruction
+
+  calminstruction gen_eof
+    local var
+    local i
+    compute i, 0
+
+    state_loop:
+      check i < NUM_STATES
+      jno done
+      call get_prefix, i
+
+      ;; No checking if it exists: it has been done in the definition itself
+      arrange var, =dq prefix.=any
+      assemble var
+      compute i, i + 1
+      jump state_loop
+
+    done:
+      exit
+  end calminstruction
+
+
+  _h5a_Tokenizer_ascii_matrix:
+    gen_ascii
+  _h5a_Tokenizer_unicode_table:
+    gen_unicode
+  _h5a_Tokenizer_eof_table:
+    gen_eof
+
+  purge get_prefix, gen_ascii, gen_unicode, gen_eof
+end macro
+
 

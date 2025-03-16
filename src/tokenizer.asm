@@ -135,7 +135,7 @@ _h5a_Tokenizer_main:
       lea  rax, [rbx + rax] ;load state's LUT
       lea  rax, [rax + r10 * 8] ;load handler
       mov  rdi, r10
-      call near [rax]
+      call qword [rax]
 
       test  eax, RESULT_BIT_AGAIN
       jnz   .exit
@@ -148,7 +148,7 @@ _h5a_Tokenizer_main:
       mov  rax, qword [r12 + H5aParser.tokenizer.state]
       shl  rax, (bsr 2 * 8)
       lea  rax, [rbx + r10 * 8] ;load handler
-      call near [rax]
+      call qword [rax]
       
       test  eax, RESULT_BIT_AGAIN
       jnz   .exit
