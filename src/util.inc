@@ -9,7 +9,12 @@ macro unlikely? opc,target
   opc target
 end macro
 
-macro enum
+calminstruction (var) constequ? val
+  transform val
+  publish var:, val
+end calminstruction
+
+macro enum?
   local counter
   counter = 0
 
@@ -26,7 +31,9 @@ macro enum
     err 'Invalid enum body form'
 
     explicit_val:
-      err 'not implemented yet'
+      arrange var, name
+      publish var:, val
+      compute counter, val + 1
       exit
 
     implicit_val:

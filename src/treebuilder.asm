@@ -9,11 +9,11 @@ include 'macro/struct.inc'
 include "util.inc"
 include "local.inc"
 
-public _h5a_TreeBuilder_acceptToken
+public _h5aTreeBuilderAcceptToken
 
 section '.text' executable
 
-_h5a_TreeBuilder_acceptToken:
+_h5aTreeBuilderAcceptToken:
   ;; R12 (s) : H5aParser *
   ;; RDI (a) : u64 ?
   ;; -> void

@@ -5,13 +5,19 @@ include "tokenizer_states.g"
 
 format ELF64
 
-extrn _h5a_Tokenizer_eat
-extrn _h5a_Tokenizer_eatInsensitive
+extrn _h5aTokenizerEat
+extrn _h5aTokenizerEatInsensitive
+
+public _k_h5a_Tokenizer_ascii_matrix
+public _k_h5a_Tokenizer_unicode_table
+public _k_h5a_Tokenizer_eof_table
+public _k_h5a_Tokenizer_spcAction_table
+public _k_h5a_Tokenizer_state_flags
 
 section '.text' executable
 
 ;; Dummy handler for development
-_h5a_Tokenizer_handle.DUMMY.any:
+_h5aTokenizerHandle.DUMMY.any:
   ;; XXX: error call?
   xor al,al
   ret
@@ -84,4 +90,13 @@ end define_state
 
 section '.rodata'
 generate_tables
+
+_k_h5a_Tokenizer_state_flags:
+repeat NUM_STATES
+  db 0x00
+end repeat
+
+public myFrickenLabel
+myFrickenLabel:
+  dq _h5aTokenizerEat
 

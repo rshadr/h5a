@@ -3,19 +3,38 @@
 # See LICENSE for details
 #
 
-all: build/libh5a.a
+all: build/libh5a.a build_tests
 
 include config.mk
 
+CFLAGS += -I./include
+
 SOURCES =\
+	parser\
 	tokenizer\
 	tokenizer_states\
 	treebuilder
 
 OBJS = $(patsubst %, build/%.o, $(SOURCES))
 
-build/tokenizer.o: src/tokenizer.asm src/local.inc src/util.inc
-build/treebuilder.o: src/treebuilder.asm src/local.inc src/util.inc
+build/parser.o: src/parser.asm \
+	src/local.inc src/util.inc
+build/tokenizer.o: src/tokenizer.asm \
+	src/local.inc src/util.inc
+build/tokenizer_states.o: src/tokenizer_states.asm \
+	src/tokenizer_states.g src/local.inc src/util.inc
+build/treebuilder.o: src/treebuilder.asm \
+	src/local.inc src/util.inc
+
+TESTS =\
+	default
+
+TEST_BINS = $(patsubst %, build/test/%, $(TESTS))
+TEST_DEPS = $(patsubst %, %.d, $(TEST_BINS))
+
+-include $(TEST_DEPS)
+
+build_tests: $(TEST_BINS)
 
 build/libh5a.a: $(OBJS)
 	@mkdir -p $(@D)
@@ -25,6 +44,10 @@ build/libh5a.a: $(OBJS)
 build/%.o: src/%.asm
 	@mkdir -p $(@D)
 	$(FASM2) -v 2 $< $@
+
+build/test/%: test/%.c build/libh5a.a
+	@mkdir -p $(@D)
+	$(CC) -o $@ -MMD $(CFLAGS) $< -L./build -lh5a -lgrapheme
 
 clean:
 	rm -rf build

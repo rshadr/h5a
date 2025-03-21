@@ -6,3 +6,4 @@ build/
 *.vgcore
 massif.out.*
 perf.*
+*.html

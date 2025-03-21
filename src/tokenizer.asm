@@ -15,11 +15,12 @@ extrn _k_h5a_Tokenizer_ascii_matrix
 extrn _k_h5a_Tokenizer_unicode_table
 extrn _k_h5a_Tokenizer_eof_table
 
-extrn _h5a_TreeBuilder_acceptToken
+extrn _h5aTreeBuilderAcceptToken
 
-public _h5a_Tokenizer_eat
-public _h5a_Tokenizer_eatInsensitive
-public _h5a_Tokenizer_main
+public _h5aTokenizerEat
+public _h5aTokenizerEatInsensitive
+public _h5aTokenizerMain
+public _k_h5a_Tokenizer_common_handler_table
 
 
 section '.rodata'
@@ -32,51 +33,51 @@ _k_h5a_Tokenizer_common_handler_table:
 
 section '.text' executable
 
-_h5a_Tokenizer_eat:
+_h5aTokenizerEat:
   ;; R12 (s): H5aParser *parser
   ;; RDI (a): char const *seq
   ;; -> RAX: bool was_matched
   xor rax,rax
   ret
 
-_h5a_Tokenizer_eatInsensitive:
+_h5aTokenizerEatInsensitive:
   ;; R12 (s): H5aParser *parser
   ;; RDI (a): char const *seq
   ;; -> RAX: bool was_matched
   xor rax,rax
   ret
 
-_h5a_Tokenizer_emitToken:
+_h5aTokenizerEmitToken:
 ;; R12 (s): H5aParser *parser
 ;; RDI (arg): opaque64 data
 ;; RSI (arg): enum type
 ;; -> void
-  lea  rax, [_h5a_TreeBuilder_acceptToken]
+  lea  rax, [_h5aTreeBuilderAcceptToken]
   jmp  rax
 
-_h5a_Tokenizer_emitCharacter:
+_h5aTokenizerEmitCharacter:
 ;; R12 (s): H5aParser *parser
 ;; EDI (arg): u32 code
 ;; -> void
   xor rsi,rsi
   mov sil, TOKEN_CHARACTER
-  jmp _h5a_Tokenizer_emitToken
+  jmp _h5aTokenizerEmitToken
 
 
-_h5a_Tokenizer_emitTag:
+_h5aTokenizerEmitTag:
 ;; R12 (s): H5aParser *parser
 ;; -> void
-  jmp _h5a_Tokenizer_emitToken
+  jmp _h5aTokenizerEmitToken
 
-_h5a_Tokenizer_emitEof:
+_h5aTokenizerEmitEof:
   ;; R12 (s): H5aParser *parser
   ;; -> u8 status
   mov sil, TOKEN_EOF
-  call _h5a_Tokenizer_emitToken
+  call _h5aTokenizerEmitToken
   mov al, RESULT_EOF_REACHED
   ret
 
-_h5a_Tokenizer_main:
+_h5aTokenizerMain:
   ;; R12 (s/lost): H5aParser *
   ;; -> EAX: status
   push rbx
@@ -101,7 +102,7 @@ _h5a_Tokenizer_main:
 
     .charLoop.readChar:
       mov   rdi, qword [r12 + H5aParser.input_stream.user_data]
-      call  near qword [r12 + H5aParser.input_stream.get_char_cb]
+      call  qword [r12 + H5aParser.input_stream.get_char_cb]
       mov   r10, rax ;keep for later
     
     .charLoop.hashChar:
@@ -112,13 +113,17 @@ _h5a_Tokenizer_main:
       xor    rax,rax
       xor    rdi,rdi
 
-      test   r10d, (not 0x7F)
-      setnz  al
+      ;test   r10d, (not 0x7F)
+      ;setnz al
+      cmp   r10d, 0x7F
+      seta  al
 
-      mov    ecx, r10d
-      not    ecx
-      test   ecx,ecx
-      setz   dil
+      ;mov    ecx, r10d
+      ;not    ecx
+      ;test   ecx,ecx
+      ;setz   dil
+      cmp   r10d, (not 0x00)
+      sete  dil
 
       add    al, dil
 
@@ -131,7 +136,7 @@ _h5a_Tokenizer_main:
 
     .charLoop.asciiLoop:
       mov  rax, qword [r12 + H5aParser.tokenizer.state]
-      shl  rax, (bsr 128 * 8)
+      shl  rax, (bsr (128 * 8))
       lea  rax, [rbx + rax] ;load state's LUT
       lea  rax, [rax + r10 * 8] ;load handler
       mov  rdi, r10
@@ -146,7 +151,7 @@ _h5a_Tokenizer_main:
 
     .charLoop.unicodeOrEofLoop:
       mov  rax, qword [r12 + H5aParser.tokenizer.state]
-      shl  rax, (bsr 2 * 8)
+      shl  rax, (bsr (2 * 8))
       lea  rax, [rbx + r10 * 8] ;load handler
       call qword [rax]
       

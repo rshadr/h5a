@@ -3,21 +3,39 @@
 ;;;; See LICENSE for details
 ;;;;
 ;;;; This file implements the custom syntax for tokenizer state handlers.
-;;;; See https://board.flatassembler.net/topic.php?t=23762 for discussion.
+;;;; See https://board.flatassembler.net/topic.php?t=23762 for old discussion.
 ;;;;
+;;;; Some preliminary clarifications:
+;;;;  "anchor" refers to the camelCase name of the base name for the state
+;;;;  handler, e.g. "data", "tagOpen", etc.
+;;;;  "prefix" refers to a symbol of the form: _h5a_Tokenizer_handle.{anchor}
+;;;;
+;;;; 
 
 
-macro define_state anchor*,index*
+macro define_state anchor*,index_name*
 ;;;
 ;;; Custom syntax
 ;;;
+  section '.text' executable
+
+  calminstruction persist_prefix anch*, idx_name*
+    local var, val
+
+    compute val, idx_name
+    arrange var, =anchorForIndex.val
+    arrange val, =_h5aTokenizerHandle.anch
+    publish var:, val
+
+  end calminstruction
+
   local prefix, beyond_index, in_seq, have_any
-  prefix equ _h5a_Tokenizer_handle.anchor
+  prefix equ _h5aTokenizerHandle.anchor
   beyond_index = 0
   in_seq = 0
   have_any = 0
 
-  section '.text' executable
+  persist_prefix anchor, index_name
 
   macro char_range pfx*,min*,max*
     repeat 1+max-min, i:min
@@ -79,7 +97,7 @@ macro define_state anchor*,index*
     assemble var
 
     ;; RDI is used here because it has no meaning yet.
-    ;; It *may* later hold uint32_t charcode, but that
+    ;; It _may_ later hold uint32_t charcode, but that
     ;; will inevitably be after the string cases.
     arrange var, =lea =rdi, =[seq_label=]
     assemble var
@@ -124,14 +142,14 @@ macro define_state anchor*,index*
     seq_yescase:
       arrange val, 0
       call seq_maybe_beyond, val
-      arrange val, =_h5a_Tokenizer_eat
+      arrange val, =_h5aTokenizerEat
       call seq_match, val, seq
       exit
 
     seq_nocase:
       arrange val, 0
       call seq_maybe_beyond, val
-      arrange val, =_h5a_Tokenizer_eatInsensitive
+      arrange val, =_h5aTokenizerEatInsensitive
       call seq_match, val, seq
       exit
 
@@ -225,12 +243,7 @@ macro define_state anchor*,index*
       check have_any
       jno no_any
 
-      compute val, index
-      arrange var, =anchorForIndex.index
-      arrange anchor, anchor ;why on earth this line?
-      publish var:, anchor
-
-      arrange var, =purge ?, =remember_anchor, =char_range, =seq_store, =seq_match, =seq_maybe_beyond
+      arrange var, =purge ?, =persist_prefix, =remember_anchor, =char_range, =seq_store, =seq_match, =seq_maybe_beyond
       assemble var
       exit
 
@@ -249,12 +262,14 @@ macro generate_tables
 
   calminstruction get_prefix index*
     local var, val
+
     arrange var, =anchorForIndex.index
     transform var
-    jno no_compensate
-      arrange var, =DUMMY
+    jyes no_compensate
+      ;; XXX: at some point this needs to throw errors
+      arrange var, =_h5aTokenizerHandle.=DUMMY
     no_compensate:
-      arrange prefix, =_h5a_Tokenizer_handle.var
+      arrange prefix, var
       exit
 
     missing_state_def:
@@ -264,7 +279,7 @@ macro generate_tables
 
 
   calminstruction gen_ascii
-    local var
+    local var, val
     local i, j
     compute i, 0
 
@@ -340,15 +355,20 @@ macro generate_tables
       exit
   end calminstruction
 
+  calminstruction gen_spc
+    asm db 0x00
+  end calminstruction
 
-  _h5a_Tokenizer_ascii_matrix:
+
+  _k_h5a_Tokenizer_ascii_matrix:
     gen_ascii
-  _h5a_Tokenizer_unicode_table:
+  _k_h5a_Tokenizer_unicode_table:
     gen_unicode
-  _h5a_Tokenizer_eof_table:
+  _k_h5a_Tokenizer_eof_table:
     gen_eof
+  _k_h5a_Tokenizer_spcAction_table:
+    gen_spc
 
   purge get_prefix, gen_ascii, gen_unicode, gen_eof
 end macro
-
 

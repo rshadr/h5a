@@ -8,7 +8,8 @@
 ;; Internal code bits (insertion modes / tokenizer states)
 ;; The least significant bit is for style only.
 ;;
-RESULT_BIT_AGAIN    equ 1 shl 1
+;RESULT_BIT_AGAIN    equ 1 shl 1
+RESULT_BIT_AGAIN    constequ 1 shl 1
 RESULT_BIT_LEAVE    equ 1 shl 2
 RESULT_BIT_CLEANUP  equ 1 shl 3
 
@@ -39,17 +40,23 @@ enum
 end enum
 
 enum
-  DATA_STATE
+  DATA_STATE = 0
   TAG_OPEN_STATE
   MARKUP_DECLARATION_OPEN_STATE
   NUM_STATES
 end enum
 
-
+;; XXX: move to public incfile?
 struct H5aParserCreateInfo
   get_char dq ?
-  user_stream_data dq ?
+  user_data dq ?
 ends
+
+enum
+  H5A_SUCCESS = 0
+  H5A_FAILURE = 1
+  H5A_PAUSED  = 2
+end enum
 
 
 struct H5aParser
