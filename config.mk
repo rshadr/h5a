@@ -6,7 +6,7 @@
 FASM2 = ~/fasm2
 
 # compiler / linker
-CC = clang -std=c23
+CC = gcc -std=c23
 CFLAGS = -Wall -Wextra -Wpedantic -O2 -ggdb3
 
 # library tools

@@ -3,11 +3,11 @@
 ;;;; See LICENSE for details
 ;;;;
 
-format ELF64
-
 include 'macro/struct.inc'
 include "util.inc"
 include "local.inc"
+
+format ELF64
 
 ;; Lookup tables
 extrn _k_h5a_Tokenizer_state_flags
@@ -22,13 +22,9 @@ public _h5aTokenizerEatInsensitive
 public _h5aTokenizerMain
 public _k_h5a_Tokenizer_common_handler_table
 
+public _k_otherTable
 
-section '.rodata'
-_k_h5a_Tokenizer_common_handler_table:
-  ;; Heterogenous table
-  dq _k_h5a_Tokenizer_ascii_matrix ;2d
-  dq _k_h5a_Tokenizer_unicode_table ;1d
-  dq _k_h5a_Tokenizer_eof_table ;1d
+
 
 
 section '.text' executable
@@ -169,3 +165,22 @@ _h5aTokenizerMain:
     xor eax,eax
     ret
 
+section '.rodata'
+public myLabelAgain
+myLabelAgain:
+  dd 0xBEEFCAFE
+  dq _h5aTreeBuilderAcceptToken
+
+
+section '.rodata'
+_k_h5a_Tokenizer_common_handler_table:
+  ;; Heterogenous table
+  dq _k_h5a_Tokenizer_ascii_matrix ;2d
+  dq _k_h5a_Tokenizer_unicode_table ;1d
+  dq _k_h5a_Tokenizer_eof_table ;1d
+  dq _h5aTreeBuilderAcceptToken ;!!
+
+_k_otherTable:
+  dq _h5aTreeBuilderAcceptToken
+
+db 0x00 ;sentinel
