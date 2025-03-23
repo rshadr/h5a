@@ -1,0 +1,6 @@
+## fasm2
+- ".rodata" contents do not get patched with relocations unless there is a
+  constant memory region somewhere in it. BSS-based linking causes this?
+
+## Valgrind
+- XLATB instruction not recognized; "illegal opcode" crash
