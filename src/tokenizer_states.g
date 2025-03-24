@@ -1,9 +1,11 @@
 
 macro define_state? name*,index_name*
-  local prefix, have_any, enable_getchar, flags
+  local prefix, have_any, enable_getchar, in_seq, beyond_index, flags
   prefix equ _h5aTokenizerHandle.name
   have_any = 0
   enable_getchar = 1
+  in_seq = 0
+  beyond_index = 0
   flags = 0
 
   calminstruction forward_prefix name_*, index_name_*
@@ -13,6 +15,90 @@ macro define_state? name*,index_name*
     arrange var, =anchorForIndex.val
     arrange val, =_h5aTokenizerHandle.name_
     publish var:, val
+  end calminstruction
+
+  calminstruction emit_spc_action_head
+    local var
+    arrange var, =public prefix.=spcActionStart
+    assemble var
+    arrange var, =label prefix.=spcActionStart
+    assemble var
+  end calminstruction
+
+  calminstruction seq_maybe_emit_beyond close_seqs*
+    local var, val, beyond
+
+    check in_seq eq 1
+    jno finish
+
+    arrange beyond, prefix.=seqBeyond.beyond_index
+    arrange var, =label beyond
+    assemble var
+    compute in_seq, 0
+    compute beyond_index, beyond_index + 1
+
+    check close_seqs
+    jno finish
+
+    asm mov al, RESULT_PARTIAL
+    asm ret
+
+    finish:
+      exit
+  end calminstruction
+
+  macro seq_store name*,seq*
+    postpone
+      section '.rodata'
+
+      public name ;dbg
+      label name
+
+      db seq
+      db 0x00
+
+      public sizeof.name
+      sizeof.name constequ $ - name
+    end postpone
+  end macro
+
+  calminstruction seq_match func*, seq*
+    local var, val
+    local seq_label, beyond
+
+    compute val, +seq
+    arrange seq_label, =_k_h5a_Tokenizer_stringPattern.val
+    arrange beyond, prefix.=seqBeyond.beyond_index
+
+    check in_seq
+    jyes err_nested
+
+    compute in_seq, 1
+
+    local l
+      arrange l, prefix.=seqStart.val
+      arrange var, =public l
+      assemble var
+      arrange var, =label l
+      assemble var
+
+    arrange var, =lea =rdi, =[seq_label=]
+    assemble var
+    arrange var, =mov =rsi, =sizeof.seq_label
+    assemble var
+    arrange var, =call func
+    assemble var
+    asm test al,al
+    arrange var, =jz beyond
+    assemble var
+    arrange var, =seq_store seq_label, seq
+    assemble var
+    exit
+
+    err_nested:
+      err 'nested string pattern'
+      exit
+
   end calminstruction
 
   macro char_range pfx*,min*,max*
@@ -30,7 +116,7 @@ macro define_state? name*,index_name*
 
     match =end? =define_state?, line
     jyes finish
-    match =no_consume?, line
+    match =@no_consume?, line
     jyes disable_getchar
     match =[=[=Exactly seq=]=], line
     jyes seq_yescase
@@ -56,10 +142,18 @@ macro define_state? name*,index_name*
 
     seq_yescase:
       compute flags, (flags or STATE_BIT_SPC_ACTION)
+      compute val, 0
+      call seq_maybe_emit_beyond, val
+      arrange val, =_h5aTokenizerEat
+      call seq_match, val, seq
       exit
 
     seq_nocase:
       compute flags, (flags or STATE_BIT_SPC_ACTION)
+      compute val, 0
+      call seq_maybe_emit_beyond, val
+      arrange val, =_h5aTokenizerEatInsensitive
+      call seq_match, val, seq
       exit
 
     grp:
@@ -121,6 +215,8 @@ macro define_state? name*,index_name*
       exit
 
     codepoint:
+      arrange val, 1
+      call seq_maybe_emit_beyond, val
       arrange var, 0x#code
       compute val, var
       arrange var, =public prefix.val
@@ -130,6 +226,8 @@ macro define_state? name*,index_name*
       exit
 
     eof:
+      arrange val, 1
+      call seq_maybe_emit_beyond, val
       arrange var, =public prefix.=eof
       assemble var
       arrange var, =label prefix.=eof
@@ -137,6 +235,8 @@ macro define_state? name*,index_name*
       exit
 
     any:
+      compute val, enable_getchar
+      call seq_maybe_emit_beyond, val
       arrange var, =public prefix.=any
       assemble var
       arrange var, =label prefix.=any
@@ -145,19 +245,31 @@ macro define_state? name*,index_name*
       exit
 
     finish:
+      arrange val, 1
+      call seq_maybe_emit_beyond, val
+
       compute val, index_name
       arrange var, =flagsForIndex.val
       compute val, flags
+      arrange val,val ;stupid hack: publish doesn't accept integers?
       publish var:, val
 
-      arrange var, =purge ?, =forward_prefix, =char_range
+      arrange var, =purge ?, =forward_prefix
+      assemble var
+      arrange var, =purge =emit_spc_action_head, =seq_maybe_emit_beyond
+      assemble var
+      arrange var, =purge =seq_store, =seq_match
+      assemble var
+      arrange var, =purge =char_range
       assemble var
       exit
 
   end calminstruction
 
+  ;; BEGIN IMMEDIATE
   ;section '.text' executable
   forward_prefix name, index_name
+  emit_spc_action_head
 end macro
 
 
@@ -183,8 +295,7 @@ macro generate_tables?
   end calminstruction
 
   calminstruction generate_ascii_matrix
-    local var, val
-    local i, j
+    local var, val, i, j
     compute i, 0
 
     state_loop:
@@ -217,8 +328,7 @@ macro generate_tables?
   end calminstruction
 
   calminstruction generate_unicode_table
-    local var
-    local i
+    local var, i
     compute i, 0
 
     state_loop:
@@ -237,8 +347,7 @@ macro generate_tables?
   end calminstruction
 
   calminstruction generate_eof_table
-    local var
-    local i
+    local var, i
     compute i, 0
 
     state_loop:
@@ -261,8 +370,47 @@ macro generate_tables?
       exit
   end calminstruction
 
+  calminstruction generate_spc_action_table
+    local var, val, i
+    compute i, 0
+
+    state_loop:
+      check i < NUM_STATES
+      jno finish
+      call get_prefix, i
+
+      ;arrange var, =dq prefix.=any
+      ;assemble var
+
+      arrange var, =flagsForIndex.i
+      transform var
+      jyes explicitly_defined
+      compute var, 0x00
+    explicitly_defined:
+      compute val, (var and STATE_BIT_SPC_ACTION)
+      check val > 0
+      jno just_zero
+
+      arrange var, =dq prefix.=spcActionStart
+      assemble var
+
+      jump state_loop_tail
+
+    just_zero:
+      asm dq 0x00
+      ;fallthrough
+
+    state_loop_tail:
+      compute i, i + 1
+      jump state_loop
+
+    finish:
+      exit
+
+  end calminstruction
+
   calminstruction generate_flags_table
-    local i
+    local var, i
     compute i, 0
 
     state_loop:
@@ -283,9 +431,6 @@ macro generate_tables?
     finish:
       exit
 
-    fail:
-      err 'unbelievable'
-      exit
   end calminstruction
 
   _k_h5a_Tokenizer_ascii_matrix:
@@ -301,9 +446,7 @@ macro generate_tables?
     dq _k_h5a_Tokenizer_eof_table
 
   _k_h5a_Tokenizer_spc_action_table:
-    repeat NUM_STATES
-      dq 0x00
-    end repeat
+    generate_spc_action_table
 
   ;; NOTE: forces non-BSS linking
   _k_h5a_Tokenizer_flags_table:
@@ -312,6 +455,7 @@ macro generate_tables?
   purge generate_ascii_matrix
   purge generate_unicode_table
   purge generate_eof_table
+  purge generate_spc_action_table
   purge generate_flags_table
 end macro
 

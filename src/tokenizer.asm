@@ -63,12 +63,16 @@ _h5aTokenizerMain:
 .charLoop:
   ; XXX: check SPC_ACTION
     lea  rbx, [_k_h5a_Tokenizer_flags_table]
-    mov  al, byte [r12 + H5aParser.tokenizer.state]
-    mov  bl, al
-    xlatb
 
+    ;; Valgrind can't XLAT arrgh!!
+    ;mov  al, byte [r12 + H5aParser.tokenizer.state]
+    ;xlatb
+    movzx rcx, byte [r12 + H5aParser.tokenizer.state]
+    movzx rax, byte [rbx + rcx * 1]
+
+    mov  bl, al
     test bl, STATE_BIT_SPC_ACTION
-    LIKELY jz .charLoop.afterSpcAction
+    likely jz .charLoop.afterSpcAction
 
 .charLoop.spcAction:
       movzx rax, byte [r12 + H5aParser.tokenizer.state]
@@ -77,7 +81,7 @@ _h5aTokenizerMain:
       push rbx
       call rcx
       pop rbx
-      test al, RESULT_BIT_AGAIN
+      test al, RESULT_BIT_PARTIAL
       likely jnz .charLoop
       nop
 .charLoop.afterSpcAction:

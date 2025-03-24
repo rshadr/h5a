@@ -10,6 +10,8 @@ include "tokenizer_states.g"
 
 format ELF64
 
+extrn _h5aTokenizerEat
+extrn _h5aTokenizerEatInsensitive
 extrn _h5aTokenizerEmitCharacter
 extrn _h5aTokenizerEmitEof
 
@@ -52,21 +54,21 @@ end define_state
 
 define_state tagOpen,TAG_OPEN_STATE
   [[U+0021 EXCLAMATION MARK]]
-    mov byte [r12 + H5aParser.tokenizer.state], 0 ;MARKUP_DECLARATION_OPEN_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], MARKUP_DECLARATION_OPEN_STATE
     xor al,al
     ret
   [[U+002F SOLIDUS]]
-    mov byte [r12 + H5aParser.tokenizer.state], 0 ;END_TAG_OPEN_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], END_TAG_OPEN_STATE
     xor al,al
     ret
   [[ASCII alpha]]
     ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], 0 ;TAG_NAME_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], TAG_NAME_STATE
     mov al, RESULT_RECONSUME
     ret
   [[U+003F QUESTION MARK]]
     ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], 0 ;BOGUS_COMMENT_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], BOGUS_COMMENT_STATE
     mov al, RESULT_RECONSUME
     ret
   [[EOF]]
@@ -89,15 +91,26 @@ end define_state
 
 
 define_state markupDeclarationOpen,MARKUP_DECLARATION_OPEN_STATE
-  ;no_consume
+
+  @no_consume
+
   [[Exactly "--"]]
     ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], 0 ;COMMENT_START_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_START_STATE
+    xor al,al
+    ret
+
   [[Case-insensitively "DOCTYPE"]]
-    mov byte [r12 + H5aParser.tokenizer.state], 0 ;DOCTYPE_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_STATE
+    xor al,al
+    ret
+
   [[Exactly "[CDATA["]]
     ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], 0 ;BOGUS_COMMENT_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], BOGUS_COMMENT_STATE
+    xor al,al
+    ret
+
   [[Anything else]]
     xor al,al
     ret

@@ -1,4 +1,12 @@
 
+calminstruction (var) constequ? val
+
+  compute val,val
+  arrange val,val
+  publish var:, val
+
+end calminstruction
+
 calminstruction likely? opc,rest&
   local var
 
