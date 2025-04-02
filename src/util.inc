@@ -69,3 +69,54 @@ macro enum?
   end calminstruction
 
 end macro
+
+macro with_saved_regs? regs&
+  local saved_regs
+
+  calminstruction ? line&
+    local var, val
+
+    match =end? =with_saved_regs?, line
+    jyes finish
+
+    assemble line
+    exit
+
+  finish:
+  pop_regs:
+    take val, saved_regs
+    jno final
+
+    arrange var, =pop val
+    assemble var
+
+    jump pop_regs
+
+  final:
+    arrange var, =purge ?
+    assemble var
+    exit
+  end calminstruction
+
+  irp reg, regs
+    push reg
+    saved_regs equ reg
+  end irp
+end macro
+
+calminstruction zero_init? ptr*,size*
+  local var
+
+  match =rdi?, ptr
+  jyes already_rsi
+
+  arrange var, =mov =rdi, ptr
+  assemble var
+
+already_rsi:
+  asm xor al,al
+  arrange var, =mov =rcx, size
+  assemble var
+  asm rep stosb
+end calminstruction
+

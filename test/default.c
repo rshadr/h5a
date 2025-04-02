@@ -11,6 +11,25 @@
 #include <grapheme.h>
 #include <h5a.h>
 
+typedef struct CharacterQueue_s {
+  char32_t *data;
+  uint32_t size;
+  uint32_t capacity;
+  int32_t front_idx;
+  int32_t back_idx;
+} CharacterQueue;
+
+extern void _CharacterQueueConstruct (CharacterQueue *cqueue);
+extern void _CharacterQueueDestroy (CharacterQueue *cqueue);
+extern char32_t _CharacterQueuePushBack (CharacterQueue *cqueue, char32_t c);
+
+struct PopResult {
+  char32_t c;
+  bool was_popped;
+};
+
+extern struct PopResult _CharacterQueuePopFront (CharacterQueue *queue);
+
 
 typedef struct {
   char *p;
@@ -124,9 +143,22 @@ main (int argc, char *argv[])
 
   createUserBuffer(&user_buffer, file_name);
 
+#if 0
   h5aCreateParser(&create_info, parser);
     h5aResumeParser(parser);
   h5aDestroyParser(parser);
+#else
+  CharacterQueue cqueue = { 0 };
+  _CharacterQueueConstruct(&cqueue);
+
+  _CharacterQueuePushBack(&cqueue, U'y');
+  _CharacterQueuePushBack(&cqueue, U'e');
+  _CharacterQueuePushBack(&cqueue, U's');
+
+  struct PopResult res = _CharacterQueuePopFront(&cqueue);
+
+  _CharacterQueueDestroy(&cqueue);
+#endif
 
   destroyUserBuffer(&user_buffer);
 

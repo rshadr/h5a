@@ -1,5 +1,5 @@
 
-macro define_state? name*,index_name*
+macro state? name*,index_name*
   local prefix, have_any, enable_getchar, in_seq, beyond_index, flags
   prefix equ _h5aTokenizerHandle.name
   have_any = 0
@@ -58,7 +58,7 @@ macro define_state? name*,index_name*
       db 0x00
 
       public sizeof.name
-      sizeof.name constequ $ - name
+      sizeof.name constequ $ - name - 1
     end postpone
   end macro
 
@@ -114,7 +114,7 @@ macro define_state? name*,index_name*
     local seq
     local group
 
-    match =end? =define_state?, line
+    match =end? =state?, line
     jyes finish
     match =@no_consume?, line
     jyes disable_getchar

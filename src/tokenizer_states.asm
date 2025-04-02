@@ -30,53 +30,65 @@ _h5aTokenizerHandle.DUMMY.any:
   xor al,al
   ret
 
-define_state data,DATA_STATE
+state data,DATA_STATE
+
   [[U+0026 AMPERSAND]]
     xor al,al
     ret
+
   [[U+003C LESS-THAN SIGN]]
     mov byte [r12 + H5aParser.tokenizer.state], TAG_OPEN_STATE
     xor al,al
     ret
+
   [[U+0000 NULL]]
     ; XXX: error
     xor al,al
     ret
+
   [[EOF]]
     xor al,al
     ret
+
   [[Anything else]]
     xor al,al
     ret
-end define_state
+
+end state
 
 ;; ...
 
-define_state tagOpen,TAG_OPEN_STATE
+state tagOpen,TAG_OPEN_STATE
+
   [[U+0021 EXCLAMATION MARK]]
     mov byte [r12 + H5aParser.tokenizer.state], MARKUP_DECLARATION_OPEN_STATE
     xor al,al
     ret
+
   [[U+002F SOLIDUS]]
     mov byte [r12 + H5aParser.tokenizer.state], END_TAG_OPEN_STATE
     xor al,al
     ret
+
   [[ASCII alpha]]
     ; ...
     mov byte [r12 + H5aParser.tokenizer.state], TAG_NAME_STATE
     mov al, RESULT_RECONSUME
     ret
+
   [[U+003F QUESTION MARK]]
     ; ...
     mov byte [r12 + H5aParser.tokenizer.state], BOGUS_COMMENT_STATE
     mov al, RESULT_RECONSUME
     ret
+
   [[EOF]]
     ; ...
     xor edi,edi
     mov dil, '<'
     call _h5aTokenizerEmitCharacter
     jmp _h5aTokenizerEmitEof
+
   [[Anything else]]
     ; ...
     xor edi,edi
@@ -85,12 +97,13 @@ define_state tagOpen,TAG_OPEN_STATE
     mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
     mov al, RESULT_RECONSUME
     ret
-end define_state
+
+end state
 
 ;; ...
 
 
-define_state markupDeclarationOpen,MARKUP_DECLARATION_OPEN_STATE
+state markupDeclarationOpen,MARKUP_DECLARATION_OPEN_STATE
 
   @no_consume
 
@@ -114,7 +127,8 @@ define_state markupDeclarationOpen,MARKUP_DECLARATION_OPEN_STATE
   [[Anything else]]
     xor al,al
     ret
-end define_state
+
+end state
 
 ;; ...
 

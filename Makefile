@@ -10,6 +10,7 @@ include config.mk
 CFLAGS += -I./include
 
 SOURCES =\
+	character_queue\
 	parser\
 	tokenizer\
 	tokenizer_states\
@@ -17,6 +18,8 @@ SOURCES =\
 
 OBJS = $(patsubst %, build/%.o, $(SOURCES))
 
+build/character_queue.o: src/character_queue.asm \
+	src/local.inc src/util.inc
 build/parser.o: src/parser.asm \
 	src/local.inc src/util.inc
 build/tokenizer.o: src/tokenizer.asm \

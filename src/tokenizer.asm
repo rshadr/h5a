@@ -14,6 +14,7 @@ extrn _k_h5a_Tokenizer_flags_table
 extrn _k_h5a_Tokenizer_spc_action_table
 extrn _k_h5a_Tokenizer_common_dispatch_table
 
+public _h5aTokenizerError
 public _h5aTokenizerEat
 public _h5aTokenizerEatInsensitive
 public _h5aTokenizerEmitCharacter
@@ -23,15 +24,27 @@ public _h5aTokenizerMain
 
 section '.text' executable
 
-_h5aTokenizerEat:
-  ;; ...
+_h5aTokenizerError:
+  ;; R12 (s): H5aParser *parser
+  ;; RDI (a): char const *errmsg
+  ;; -> void
+  ret
+
+_h5aTokenizerEatGeneric:
+  ;; R12 (s): H5aParser *parser
+  ;; RDI (a): char8 const *str
+  ;; RSI (a): u64 len
+  ;; RDX (a): __asm__ char32 (*filter) (char32 c)
   xor al,al
   ret
 
+_h5aTokenizerEat:
+  ;; ...
+  jmp _h5aTokenizerEatGeneric
+
 _h5aTokenizerEatInsensitive:
   ;; ...
-  xor al,al
-  ret
+  jmp _h5aTokenizerEatGeneric
 
 _h5aTokenizerEmitToken:
   ;; ...
@@ -52,6 +65,86 @@ _h5aTokenizerEmitEof:
   call _h5aTokenizerEmitToken
   mov al, RESULT_EOF_REACHED
   ret
+
+_h5aTokenizerPrefetchChars:
+;; R12 (omni): H5aParser *parser
+;; RDI (a): u32 count
+;; -> bool have_that_many
+
+  mov al, byte [r12 + H5aParser.tokenizer.saw_eof]
+  test al,al
+  likely jz .inputLeft
+
+  xor rax,rax
+  ret
+
+.inputLeft:
+
+  push rbx ;count store
+  push rdx ;char store
+  push r13 ;[zero store
+  mov ebx, edi
+  mov r13b, 1
+
+.loop:
+  ;cmp dword [r12 + H5aParser.input_buffer.size], rbx ;!!!
+  cmp rbx, 0
+  ; XXX
+  jge .finish
+
+  mov rdi, qword [r12 + H5aParser.input_stream.user_data]
+  call qword [r12 + H5aParser.input_stream.get_char_cb]
+  mov edx, eax
+
+  mov al, byte [r12 + H5aParser.tokenizer.saw_eof]
+  cmp edx, '\n'
+  setne cl
+  test al,cl
+  jz .noWaitingCarriage
+
+  ; XXX: push_back '\n'
+
+.noWaitingCarriage:
+  cmp edx, '\r'
+  sete byte [r12 + H5aParser.tokenizer.saw_cr] ;forward-store
+  setne al
+
+  test al,al
+  jnz .noCarriage
+
+.noCarriage:
+  ; XXX: push_back c
+
+  not edx
+  test edx,edx
+  jnz .noEof
+
+  mov byte [r12 + H5aParser.tokenizer.saw_eof], 1
+  xor r13b,r13b
+.finish:
+  xor rax,rax
+  mov eax, r13d
+  pop r13
+  pop rdx
+  pop rbx
+  ret
+
+.noEof:
+  jmp .loop
+
+
+_h5aTokenizerGetChar:
+;; R12 (omni): H5aParser *parser
+
+  xor rdi,rdi
+  mov dil, 1
+  call _h5aTokenizerPrefetchChars
+
+  ; XXX: assert not empty
+
+  xor eax,eax; XXX: pop_back
+  ret
+
 
 _h5aTokenizerMain:
 ;; R12 (omni:lost): H5aParser *
@@ -78,9 +171,9 @@ _h5aTokenizerMain:
       movzx rax, byte [r12 + H5aParser.tokenizer.state]
       lea rcx, [_k_h5a_Tokenizer_spc_action_table]
       mov rcx, [rcx + rax * 8]
-      push rbx
+      ;;push rbx
       call rcx
-      pop rbx
+      ;;pop rbx
       test al, RESULT_BIT_PARTIAL
       likely jnz .charLoop
       nop

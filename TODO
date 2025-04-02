@@ -1,0 +1,2 @@
+- Queue (for getChar) [~]
+- Replace LUT dispatcher with simple, 1-dimensional handler lookup and branched handling

@@ -1,14 +1,27 @@
 
+struct CharacterQueue
+  data dq ?
+  size dd ?
+  capacity dd ?
+  front_idx dd ?
+  back_idx dd ?
+ends
+
 struct H5aParser
   input_stream.get_char_cb  dq ?
   input_stream.user_data    dq ?
 
   tokenizer.char_ref        dq ?
+  tokenizer.input_buffer    rb sizeof.CharacterQueue
+  tokenizer.newline_count   dw ?
 
   tokenizer.state           db ?
   tokenizer.return_state    db ?
   treebuilder.mode          db ?
   treebuilder.original_mode db ?
+
+  tokenizer.saw_cr          db ?
+  tokenizer.saw_eof         db ?
 ends
 
 enum
