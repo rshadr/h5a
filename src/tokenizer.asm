@@ -14,6 +14,9 @@ extrn _k_h5a_Tokenizer_flags_table
 extrn _k_h5a_Tokenizer_spc_action_table
 extrn _k_h5a_Tokenizer_common_dispatch_table
 
+extrn _CharacterQueuePushBack
+extrn _CharacterQueueSubscript
+
 public _h5aTokenizerError
 public _h5aTokenizerEat
 public _h5aTokenizerEatInsensitive
@@ -30,20 +33,105 @@ _h5aTokenizerError:
   ;; -> void
   ret
 
+_h5aTokenizerEatFilterNone:
+  ;; Identity filter
+  ;; inout EDI: char32 c
+  ret
+
+_h5aTokenizerEatFilterCase:
+  ;; Lower to upper ASCII filter
+  ;; inout EDI: char32 c
+  cmp edi, 'A'
+  jnc .finish
+  cmp edi, 'Z'
+  jnc .finish
+
+  xor edi, ('A' xor 'a')
+
+.finish:
+  ret
+
+public _h5aTokenizerEatGeneric
 _h5aTokenizerEatGeneric:
   ;; R12 (s): H5aParser *parser
   ;; RDI (a): char8 const *str
   ;; RSI (a): u64 len
-  ;; RDX (a): __asm__ char32 (*filter) (char32 c)
+  ;; RDX (a): __xabi__ char32 (*filter) (char32 c)
+  with_saved_regs rdi, rsi, rdx
+    mov rdi, rsi
+    call _h5aTokenizerPrefetchChars
+  end with_saved_regs
+  test al,al
+  jz .fail
+
+  push rbx
+  push r13
+  push r14
+  push r15
+
+  mov rbx, rdi ;str
+  mov r13, rsi ;len
+  mov r14, rdx ;filter
+  xor r15,r15 ;index
+
+.loop:
+  cmp r15, r13
+  jge .loop.finish
+
+  ; filter buffer
+  lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
+  mov rsi, r15
+  call _CharacterQueueSubscript
+  mov esi, dword [rax]
+  call r14
+  mov ecx, esi
+
+  ; filter pattern
+  mov rsi, rbx
+  xor eax,eax
+  lodsb
+  mov esi, eax
+  call r14
+
+  cmp ecx, esi
+  jne .loop.mismatch
+
+  inc r15
+  inc rbx
+  jmp .loop
+
+.loop.mismatch:
+  pop r15
+  pop r14
+  pop r13
+  pop rbx
+  xor al,al
+  ret
+
+.loop.finish:
+  pop r15
+  pop r14
+  pop r13
+  pop rbx
+  mov al, 1
+  ret
+
+.fail:
   xor al,al
   ret
 
 _h5aTokenizerEat:
-  ;; ...
+  ;; R12 (s): H5aParser *parser
+  ;; RDI (a): char8 const *str
+  ;; RSI (a): u64 len
+  lea rdx, [_h5aTokenizerEatFilterNone]
   jmp _h5aTokenizerEatGeneric
 
 _h5aTokenizerEatInsensitive:
-  ;; ...
+  ;; R12 (s): H5aParser *parser
+  ;; RDI (a): char8 const *str
+  ;; RSI (a): u64 len
+  lea rdx, [_h5aTokenizerEatFilterCase]
   jmp _h5aTokenizerEatGeneric
 
 _h5aTokenizerEmitToken:
@@ -66,6 +154,7 @@ _h5aTokenizerEmitEof:
   mov al, RESULT_EOF_REACHED
   ret
 
+public _h5aTokenizerPrefetchChars
 _h5aTokenizerPrefetchChars:
 ;; R12 (omni): H5aParser *parser
 ;; RDI (a): u32 count
@@ -82,45 +171,54 @@ _h5aTokenizerPrefetchChars:
 
   push rbx ;count store
   push rdx ;char store
-  push r13 ;[zero store
+  push r13 ;zero store
+  xor rbx,rbx
   mov ebx, edi
   mov r13b, 1
 
 .loop:
-  ;cmp dword [r12 + H5aParser.input_buffer.size], rbx ;!!!
-  cmp rbx, 0
-  ; XXX
+  cmp dword [r12 + H5aParser.tokenizer.input_buffer + CharacterQueue.size], ebx
   jge .finish
 
   mov rdi, qword [r12 + H5aParser.input_stream.user_data]
   call qword [r12 + H5aParser.input_stream.get_char_cb]
   mov edx, eax
 
-  mov al, byte [r12 + H5aParser.tokenizer.saw_eof]
-  cmp edx, '\n'
+  mov al, byte [r12 + H5aParser.tokenizer.saw_cr]
+  cmp edx, 0x0A
   setne cl
-  test al,cl
+  test al, cl
   jz .noWaitingCarriage
 
-  ; XXX: push_back '\n'
+  with_saved_regs rdx
+    lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
+    xor rsi,rsi
+    mov sil, 0x0A
+    call _CharacterQueuePushBack
+    mov rdx, rax
+  end with_saved_regs
 
 .noWaitingCarriage:
-  cmp edx, '\r'
+  cmp edx, 0x0D
   sete byte [r12 + H5aParser.tokenizer.saw_cr] ;forward-store
-  setne al
-
-  test al,al
-  jnz .noCarriage
+  je .noNoCarriage
 
 .noCarriage:
   ; XXX: push_back c
+  lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
+  xor rsi,rsi
+  mov esi, edx
+  call _CharacterQueuePushBack
+  mov rdx, rax
 
+.noNoCarriage:
   not edx
   test edx,edx
-  jnz .noEof
+  jnz .loop
 
+.gotEof:
   mov byte [r12 + H5aParser.tokenizer.saw_eof], 1
-  xor r13b,r13b
+  xor r13b,r13b ;return false
 .finish:
   xor rax,rax
   mov eax, r13d
@@ -132,7 +230,7 @@ _h5aTokenizerPrefetchChars:
 .noEof:
   jmp .loop
 
-
+public _h5aTokenizerGetChar
 _h5aTokenizerGetChar:
 ;; R12 (omni): H5aParser *parser
 

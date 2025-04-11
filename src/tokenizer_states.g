@@ -23,6 +23,7 @@ macro state? name*,index_name*
     assemble var
     arrange var, =label prefix.=spcActionStart
     assemble var
+    asm nop
   end calminstruction
 
   calminstruction seq_maybe_emit_beyond close_seqs*

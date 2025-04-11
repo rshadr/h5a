@@ -143,7 +143,7 @@ main (int argc, char *argv[])
 
   createUserBuffer(&user_buffer, file_name);
 
-#if 0
+#if 1
   h5aCreateParser(&create_info, parser);
     h5aResumeParser(parser);
   h5aDestroyParser(parser);

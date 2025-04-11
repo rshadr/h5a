@@ -9,6 +9,8 @@ include "local.inc"
 
 format ELF64
 
+extrn _CharacterQueueConstruct
+extrn _CharacterQueueDestroy
 extrn _h5aTokenizerMain
 
 public h5aCreateParser
@@ -38,6 +40,11 @@ h5aCreateParser:
   mov rax, qword [rdi + H5aParserCreateInfo.user_data]
   mov qword [rsi + H5aParser.input_stream.user_data], rax
 
+  with_saved_regs rdi, rsi
+    lea rdi, [rsi + H5aParser.tokenizer.input_buffer]
+    call _CharacterQueueConstruct
+  end with_saved_regs
+
   ;mov qword [rsi + H5aParser.tokenizer.state], DATA_STATE
   ;mov qword [rsi + H5aParser.treebuilder.mode], 0
 
@@ -46,6 +53,11 @@ h5aCreateParser:
 
 h5aDestroyParser:
 ;; RDI: H5aParser *parser
+  with_saved_regs r12
+    mov r12, rdi
+    lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
+    call _CharacterQueueDestroy
+  end with_saved_regs
   mov eax, H5A_SUCCESS
   ret
 

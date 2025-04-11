@@ -16,6 +16,7 @@ public _CharacterQueueConstruct
 public _CharacterQueueDestroy
 public _CharacterQueuePushBack
 public _CharacterQueuePopFront
+public _CharacterQueueSubscript
 
 section '.rodata'
 _CharacterQueue_init_capacity:
@@ -125,4 +126,36 @@ _CharacterQueuePopFront:
   mov rdx, 1
   ; no need to upper-clear
   mov eax, r8d
+  ret
+
+
+_CharacterQueueSubscript:
+  ;; RDI (a): CharacterQueue *cqueue
+  ;; ESI (a): i32 index
+  ;; -> RAX: char32_t *addr
+  ;movzx rsi, esi
+  cmp esi, dword [rdi + CharacterQueue.size]
+  jge .fail
+
+  mov rdx, qword [rdi + CharacterQueue.data]
+
+  mov ecx, dword [rdi + CharacterQueue.capacity]
+  sub ecx, dword [rdi + CharacterQueue.front_idx]
+  cmp esi, ecx
+  jge .lateSlice
+  ;; [c c c 0 0 0 c c]
+  ;;        ^     ^
+  ;;        e     f
+  ;;  a a a a     b b
+  ;;
+  ;; a: late slice
+  ;; b: early slice
+.earlySlice:
+  add esi, dword [rdi + CharacterQueue.front_idx]
+.lateSlice:
+  lea rax, [rdx + rsi * 4]
+  ret
+  
+.fail:
+  xor rax,rax
   ret
