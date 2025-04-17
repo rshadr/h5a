@@ -33,6 +33,8 @@ _h5aTokenizerHandle.DUMMY.any:
 state data,DATA_STATE
 
   [[U+0026 AMPERSAND]]
+    mov byte [r12 + H5aParser.tokenizer.return_state], DATA_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], CHARACTER_REFERENCE_STATE
     xor al,al
     ret
 
@@ -56,7 +58,99 @@ state data,DATA_STATE
 
 end state
 
-;; ...
+
+state rcdata,RCDATA_STATE
+
+  [[U+0026 AMPERSAND]]
+    mov byte [r12 + H5aParser.tokenizer.return_state], DATA_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], CHARACTER_REFERENCE_STATE
+    xor al,al
+    ret
+
+  [[U+003C LESS-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], RCDATA_LESS_THAN_SIGN_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    xor al,al
+    ret
+
+end state
+
+
+state rawtext,RAWTEXT_STATE
+
+  [[U+003C LESS-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_LESS_THAN_SIGN_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    xor al,al
+    ret
+
+end state
+
+
+state scriptData,SCRIPT_DATA_STATE
+
+  [[U+003C LESS-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_LESS_THAN_SIGN_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    xor al,al
+    ret
+
+end state
+
+
+state plaintext,PLAINTEXT_STATE
+
+  [[U+000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    xor al,al
+    ret
+
+end state
+
 
 state tagOpen,TAG_OPEN_STATE
 
@@ -100,7 +194,460 @@ state tagOpen,TAG_OPEN_STATE
 
 end state
 
+
+state endTagOpen,END_TAG_OPEN_STATE
+
+  [[ASCII alpha]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], TAG_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], BOGUS_COMMENT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state tagName,TAG_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_NAME_STATE
+    xor al,al
+    ret
+
+  [[U+002F SOLIDUS]]
+    mov byte [r12 + H5aParser.tokenizer.state], SELF_CLOSING_START_TAG_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    ; emit
+    xor al,al
+    ret
+
+  [[ASCII upper alpha]]
+    ;; append
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; append
+    xor al,al
+    ret
+
+end state
+
+
+state rcdataLessThanSign,RCDATA_LESS_THAN_SIGN_STATE
+
+  [[U+002F SOLIDUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], RCDATA_END_TAG_OPEN_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], RCDATA_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state rcdataEndTagOpen,RCDATA_END_TAG_OPEN_STATE
+
+  [[ASCII alpha]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], RCDATA_END_TAG_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], RCDATA_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state rcdataEndTagName,RCDATA_END_TAG_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[U+002F SOLIDUS]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[ASCII upper alpha]]
+    ; ...
+    xor al,al
+    ret
+
+  [[ASCII lower alpha]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], RCDATA_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
 ;; ...
+
+state beforeAttributeName,BEFORE_ATTRIBUTE_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov al, RESULT_IGNORE
+    ret
+
+  [[U+002F SOLIDUS]]
+  [[U+003E GREATER-THAN SIGN]]
+  [[EOF]]
+    mov byte [r12 + H5aParser.tokenizer.state], AFTER_ATTRIBUTE_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[U+003D EQUALS SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], ATTRIBUTE_NAME_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], ATTRIBUTE_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state attributeName,ATTRIBUTE_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+0020 SPACE]]
+  [[U+002F SOLIDUS]]
+  [[U+003E GREATER-THAN SIGN]]
+  [[EOF]]
+    mov byte [r12 + H5aParser.tokenizer.state], AFTER_ATTRIBUTE_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[U+003D EQUALS SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_VALUE_STATE
+    xor al,al
+    ret
+
+  [[ASCII upper alpha]]
+    ; ... append
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[U+0022 QUOTATION MARK]]
+  [[U+0027 APOSTROPHE]]
+  [[U+003C LESS-THAN SIGN]]
+    ; ...
+    ; fallthrough
+  [[Anything else]]
+    ; append
+    xor al,al
+    ret
+
+end state
+
+
+state afterAttributeName,AFTER_ATTRIBUTE_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov al, RESULT_IGNORE
+    ret
+
+  [[U+002F SOLIDUS]]
+    mov byte [r12 + H5aParser.tokenizer.state], SELF_CLOSING_START_TAG_STATE
+    xor al,al
+    ret
+
+  [[U+003D EQUALS SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_VALUE_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], ATTRIBUTE_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state beforeAttributeValue,BEFORE_ATTRIBUTE_VALUE_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov al, RESULT_IGNORE
+    ret
+
+  [[U+0022 QUOTATION MARK]]
+    mov byte [r12 + H5aParser.tokenizer.state], ATTRIBUTE_VALUE_DOUBLE_QUOTED_STATE
+    xor al,al
+    ret
+
+  [[U+0027 APOSTROPHE]]
+    mov byte [r12 + H5aParser.tokenizer.state], ATTRIBUTE_VALUE_SINGLE_QUOTED_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], ATTRIBUTE_VALUE_UNQUOTED_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state attributeValueDoubleQuoted,ATTRIBUTE_VALUE_DOUBLE_QUOTED_STATE
+
+  [[U+0022 QUOTATION MARK]]
+    mov byte [r12 + H5aParser.tokenizer.state], AFTER_ATTRIBUTE_VALUE_QUOTED_STATE
+    xor al,al
+    ret
+
+  [[U+0026 AMPERSAND]]
+    mov byte [r12 + H5aParser.tokenizer.return_state], ATTRIBUTE_VALUE_DOUBLE_QUOTED_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], CHARACTER_REFERENCE_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    xor al,al
+    ret
+
+end state
+
+
+state attributeValueSingleQuoted,ATTRIBUTE_VALUE_SINGLE_QUOTED_STATE
+
+  [[U+0027 APOSTROPHE]]
+    mov byte [r12 + H5aParser.tokenizer.state], AFTER_ATTRIBUTE_VALUE_QUOTED_STATE
+    xor al,al
+    ret
+
+  [[U+0026 AMPERSAND]]
+    mov byte [r12 + H5aParser.tokenizer.return_state], ATTRIBUTE_VALUE_SINGLE_QUOTED_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], CHARACTER_REFERENCE_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    xor al,al
+    ret
+
+end state
+
+
+state attributeValueUnquoted,ATTRIBUTE_VALUE_UNQUOTED_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_NAME_STATE
+    xor al,al
+    ret
+
+  [[U+0026 AMPERSAND]]
+    mov byte [r12 + H5aParser.tokenizer.return_state], ATTRIBUTE_VALUE_UNQUOTED_STATE
+    mov byte [r12 + H5aParser.tokenizer.state], CHARACTER_REFERENCE_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    ; emit
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[U+0022 QUOTATION MARK]]
+  [[U+0027 APOSTROPHE]]
+  [[U+003C LESS-THAN SIGN]]
+  [[U+003D EQUALS SIGN]]
+  [[U+0060 GRAVE ACCENT]]
+    ; XXX: bad order!
+    ; ...
+    ;fallthrough
+
+  [[Anything else]]
+    ; ...
+    xor al,al
+    ret
+end state
+
+
+state afterAttributeValueQuoted,AFTER_ATTRIBUTE_VALUE_QUOTED_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_NAME_STATE
+    xor al,al
+    ret
+
+  [[U+002F SOLIDUS]]
+    mov byte [r12 + H5aParser.tokenizer.state], SELF_CLOSING_START_TAG_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    ; emit
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ..
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+;; ...
+
+state bogusComment,BOGUS_COMMENT_STATE
+
+  [[U+003E GREATER-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    ;emit
+    xor al,al
+    ret
+
+  [[EOF]]
+    ;emit comment
+    jmp _h5aTokenizerEmitEof
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ; append
+    xor al,al
+    ret
+
+end state
 
 
 state markupDeclarationOpen,MARKUP_DECLARATION_OPEN_STATE
@@ -126,6 +673,538 @@ state markupDeclarationOpen,MARKUP_DECLARATION_OPEN_STATE
 
   [[Anything else]]
     xor al,al
+    ret
+
+end state
+
+
+state commentStart,COMMENT_START_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_START_DASH_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state commentStartDash,COMMENT_START_DASH_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_END_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state comment,COMMENT_STATE
+
+  [[U+003C LESS-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_LESS_THAN_SIGN_STATE
+    xor al,al
+    ret
+
+  [[U+002D HYPHEN-MINUS]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_END_DASH_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    xor al,al
+    ret
+
+end state
+
+
+state commentLessThanSign,COMMENT_LESS_THAN_SIGN_STATE
+
+  [[U+0021 EXCLAMATION MARK]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_LESS_THAN_SIGN_BANG_STATE
+    xor al,al
+    ret
+
+  [[U+003C LESS-THAN SIGN]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state commentLessThanSignBang,COMMENT_LESS_THAN_SIGN_BANG_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    xor al,al
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_LESS_THAN_SIGN_BANG_DASH_STATE
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state commentLessThanSignBangDash,COMMENT_LESS_THAN_SIGN_BANG_DASH_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_LESS_THAN_SIGN_BANG_DASH_DASH_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_END_DASH_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state commentLessThanSignBangDashDash,COMMENT_LESS_THAN_SIGN_BANG_DASH_DASH_STATE
+
+  [[U+003E GREATER-THAN SIGN]]
+  [[EOF]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_END_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_END_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state commentEndDash,COMMENT_END_DASH_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_END_STATE
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state commentEnd,COMMENT_END_STATE
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[U+0021 EXCLAMATION MARK]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_END_BANG_STATE
+    xor al,al
+    ret
+
+  [[U+002D HYPHEN-MINUS]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state commentEndBang,COMMENT_END_BANG_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], COMMENT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state doctype,DOCTYPE_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_DOCTYPE_NAME_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_DOCTYPE_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[EOF]]
+    ;; error
+    ;; create doctype
+    ;; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ;; error
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_DOCTYPE_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state beforeDoctypeName,BEFORE_DOCTYPE_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov al, RESULT_IGNORE
+    ret
+
+  [[ASCII upper alpha]]
+    ;; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ;; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ;; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    ;; emit
+    xor al,al
+    ret
+
+  [[EOF]]
+    ;; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ;; ...
+    mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
+    xor al,al
+    ret
+
+end state
+
+
+state doctypeName,DOCTYPE_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov byte [r12 + H5aParser.tokenizer.state], AFTER_DOCTYPE_NAME_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ;; emit
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    xor al,al
+    ret
+
+  [[ASCII upper alpha]]
+    ;; ...
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ;; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    ;; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ;; ...
+    xor al,al
+    ret
+
+end state
+
+
+state afterDoctypeName,AFTER_DOCTYPE_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov al, RESULT_IGNORE
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; emit
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    xor al,al
+    ret
+
+  [[EOF]]
+    ;; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ;; XXX: local-scoped labels???
+    mov byte [r12 + H5aParser.tokenizer.state], BOGUS_DOCTYPE_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+;; ...
+
+state bogusDoctype,BOGUS_DOCTYPE_STATE
+
+  [[U+003E GREATER-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    ;; emit
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ;; ...
+    mov al, RESULT_IGNORE
+    ret
+
+  [[EOF]]
+    ;; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    mov al, RESULT_IGNORE
+    ret
+
+end state
+
+;; ...
+
+state characterReference,CHARACTER_REFERENCE_STATE
+  ;; clear tmpbuf
+
+  [[ASCII alphanumeric]]
+    mov byte [r12 + H5aParser.tokenizer.state], NAMED_CHARACTER_REFERENCE_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[U+0023 NUMBER SIGN]]
+    ;; append
+public myLabello
+myLabello:
+    mov byte [r12 + H5aParser.tokenizer.state], NUMERIC_CHARACTER_REFERENCE_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ;; flush code points...
+    mov al, byte [r12 + H5aParser.tokenizer.return_state]
+    mov byte [r12 + H5aParser.tokenizer.state], al
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+;; ...
+
+state numericCharacterReference,NUMERIC_CHARACTER_REFERENCE_STATE
+
+  [[U+0078 LATIN SMALL LETTER X]]
+  [[U+0058 LATIN CAPITAL LETTER X]]
+    ;; append
+    mov byte [r12 + H5aParser.tokenizer.state], HEXADECIMAL_CHARACTER_REFERENCE_START_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], DECIMAL_CHARACTER_REFERENCE_START_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state hexadecimalCharacterReferenceStart,HEXADECIMAL_CHARACTER_REFERENCE_START_STATE
+
+  [[ASCII hex digit]]
+    mov byte [r12 + H5aParser.tokenizer.state], HEXADECIMAL_CHARACTER_REFERENCE_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[Anything else]]
+    ;; ...
+    mov cl, byte [r12 + H5aParser.tokenizer.return_state]
+    mov byte [r12 + H5aParser.tokenizer.state], cl
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state decimalCharacterReferenceStart,DECIMAL_CHARACTER_REFERENCE_START_STATE
+
+  [[ASCII digit]]
+    mov byte [r12 + H5aParser.tokenizer.state], DECIMAL_CHARACTER_REFERENCE_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[Anything else]]
+    mov cl, byte [r12 + H5aParser.tokenizer.return_state]
+    mov byte [r12 + H5aParser.tokenizer.state], cl
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state hexadecimalCharacterReference,HEXADECIMAL_CHARACTER_REFERENCE_STATE
+
+  [[ASCII digit]]
+    mov rdx, qword [r12 + H5aParser.tokenizer.char_ref]
+    shl rdx, 4
+    sub di, 0x30
+    add rdx, rdi
+    mov qword [r12 + H5aParser.tokenizer.char_ref], rdx
+    xor al,al
+    ret
+
+  [[ASCII upper hex digit]]
+    mov rdx, qword [r12 + H5aParser.tokenizer.char_ref]
+    shl rdx, 4
+    sub di, 0x37
+    add rdx, rdi
+    mov qword [r12 + H5aParser.tokenizer.char_ref], rdx
+    xor al,al
+    ret
+
+  [[ASCII lower hex digit]]
+    mov rdx, qword [r12 + H5aParser.tokenizer.char_ref]
+    shl rdx, 4
+    sub di, 0x57
+    add rdx, rdi
+    mov qword [r12 + H5aParser.tokenizer.char_ref], rdx
+    xor al,al
+    ret
+
+  [[U+003B SEMICOLON]]
+    mov byte [r12 + H5aParser.tokenizer.state], NUMERIC_CHARACTER_REFERENCE_END_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ;; ...
+    mov byte [r12 + H5aParser.tokenizer.state], NUMERIC_CHARACTER_REFERENCE_END_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state decimalCharacterReference,DECIMAL_CHARACTER_REFERENCE_STATE
+
+  [[ASCII digit]]
+    mov rax, qword [r12 + H5aParser.tokenizer.char_ref]
+    xor rcx,rcx
+    mov cl, 10
+    mul rcx
+    sub di, 0x30
+    add rax, rdi
+    mov qword [r12 + H5aParser.tokenizer.char_ref], rax
+    xor al,al
+    ret
+
+  [[U+003B SEMICOLON]]
+    mov byte [r12 + H5aParser.tokenizer.state], NUMERIC_CHARACTER_REFERENCE_END_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ;; ...
+    mov byte [r12 + H5aParser.tokenizer.state], NUMERIC_CHARACTER_REFERENCE_END_STATE
+    mov al, RESULT_RECONSUME
     ret
 
 end state

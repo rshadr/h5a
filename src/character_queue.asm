@@ -130,6 +130,10 @@ _CharacterQueuePopFront:
 
 
 _CharacterQueueSubscript:
+  ;;
+  ;; C++ like array[] operator, except it doesn't create missing spots
+  ;;
+  ;;
   ;; RDI (a): CharacterQueue *cqueue
   ;; ESI (a): i32 index
   ;; -> RAX: char32_t *addr
@@ -146,6 +150,11 @@ _CharacterQueueSubscript:
   ;; [c c c 0 0 0 c c]
   ;;        ^     ^
   ;;        e     f
+  ;;        n     r
+  ;;        d     o
+  ;;              n
+  ;;              t
+  ;;
   ;;  a a a a     b b
   ;;
   ;; a: late slice

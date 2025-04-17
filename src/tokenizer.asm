@@ -15,6 +15,7 @@ extrn _k_h5a_Tokenizer_spc_action_table
 extrn _k_h5a_Tokenizer_common_dispatch_table
 
 extrn _CharacterQueuePushBack
+extrn _CharacterQueuePopFront
 extrn _CharacterQueueSubscript
 
 public _h5aTokenizerError
@@ -76,7 +77,7 @@ _h5aTokenizerEatGeneric:
 
 .loop:
   cmp r15, r13
-  jge .loop.finish
+  jge .success
 
   ; filter buffer
   lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
@@ -94,13 +95,13 @@ _h5aTokenizerEatGeneric:
   call r14
 
   cmp ecx, esi
-  jne .loop.mismatch
+  jne .mismatch
 
   inc r15
   inc rbx
   jmp .loop
 
-.loop.mismatch:
+.mismatch:
   pop r15
   pop r14
   pop r13
@@ -108,11 +109,26 @@ _h5aTokenizerEatGeneric:
   xor al,al
   ret
 
-.loop.finish:
+.success:
+  xor rbx,rbx
+
+.success.popLoop:
+  ; XXX: pop all at once
+    cmp rbx, r13
+    jge .success.finish
+
+    lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
+    call _CharacterQueuePopFront
+
+    inc rbx
+    jmp .success.popLoop
+
+.success.finish:
   pop r15
   pop r14
   pop r13
   pop rbx
+
   mov al, 1
   ret
 
@@ -204,7 +220,6 @@ _h5aTokenizerPrefetchChars:
   je .noNoCarriage
 
 .noCarriage:
-  ; XXX: push_back c
   lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
   xor rsi,rsi
   mov esi, edx
@@ -316,9 +331,9 @@ _h5aTokenizerMain:
       call   rax
 
       test al, RESULT_BIT_AGAIN
-      jnz .exit
-      test al, RESULT_BIT_LEAVE
       jnz .charLoop.asciiLoop
+      test al, RESULT_BIT_LEAVE
+      jnz .exit
 
       jmp .charLoop
 
@@ -330,12 +345,13 @@ _h5aTokenizerMain:
       xor rax,rax
       mov al, byte [r12 + H5aParser.tokenizer.state]
       mov rax, qword [rbx + rax * 8]
+      mov rdi, r10
       call rax
 
       test al, RESULT_BIT_AGAIN
-      jnz .exit
-      test al, RESULT_BIT_LEAVE
       jnz .charLoop.unicodeOrEofLoop
+      test al, RESULT_BIT_LEAVE
+      jnz .exit
 
       jmp .charLoop
     

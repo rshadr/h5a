@@ -204,13 +204,13 @@ macro state? name*,index_name*
       arrange var, =char_range prefix,'0','9'
       assemble var
     grp_uphex:
-      err 'untested'
+      ;err 'untested' ;maybe wrong?
       arrange var, =char_range prefix,'A','F'
       assemble var
       exit
 
     grp_lowhex:
-      err 'untested'
+      ;err 'untested' ;maybe wrong?
       arrange var, =char_range prefix,'a', 'f'
       assemble var
       exit
