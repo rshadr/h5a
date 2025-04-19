@@ -234,6 +234,7 @@ _h5aTokenizerPrefetchChars:
 .gotEof:
   mov byte [r12 + H5aParser.tokenizer.saw_eof], 1
   xor r13b,r13b ;return false
+  ; falltrough
 .finish:
   xor rax,rax
   mov eax, r13d
@@ -254,8 +255,9 @@ _h5aTokenizerGetChar:
   call _h5aTokenizerPrefetchChars
 
   ; XXX: assert not empty
+  lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
+  call _CharacterQueuePopFront
 
-  xor eax,eax; XXX: pop_back
   ret
 
 
@@ -294,7 +296,7 @@ _h5aTokenizerMain:
       test bl, STATE_BIT_NO_GETCHAR
       likely jz .charLoop.readChar
       nop
-      unlikely jmp .charLoop
+      jmp .charLoop
       
 .charLoop.readChar:
       mov  rdi, qword [r12 + H5aParser.input_stream.user_data]

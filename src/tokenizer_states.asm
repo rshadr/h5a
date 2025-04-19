@@ -340,6 +340,521 @@ state rcdataEndTagName,RCDATA_END_TAG_NAME_STATE
 
 end state
 
+
+state rawtextLessThanSign,RAWTEXT_LESS_THAN_SIGN_STATE
+
+  [[U+002F SOLIDUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_END_TAG_OPEN_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state rawtextEndTagOpen,RAWTEXT_END_TAG_OPEN_STATE
+
+  [[ASCII alpha]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], RCDATA_END_TAG_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state rawtextEndTagName,RAWTEXT_END_TAG_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[U+002F SOLIDUS]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[ASCII upper alpha]]
+    ; ...
+    xor al,al
+    ret
+
+  [[ASCII lower alpha]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state scriptDataLessThanSign,SCRIPT_DATA_LESS_THAN_SIGN_STATE
+
+  [[U+002F SOLIDUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_END_TAG_OPEN_STATE
+    xor al,al
+    ret
+
+  [[U+0021 EXCLAMATION MARK]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPE_START_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state scriptDataEndTagOpen,SCRIPT_DATA_END_TAG_OPEN_STATE
+
+  [[ASCII alpha]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_END_TAG_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state scriptDataEndTagName,SCRIPT_DATA_END_TAG_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[U+002F SOLIDUS]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[ASCII upper alpha]]
+    ; ...
+    xor al,al
+    ret
+
+  [[ASCII lower alpha]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state scriptDataEscapeStart,SCRIPT_DATA_ESCAPE_START_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPE_START_DASH_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state scriptDataEscapeStartDash,SCRIPT_DATA_ESCAPE_START_DASH_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_DASH_DASH_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state scriptDataEscaped,SCRIPT_DATA_ESCAPED_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_DASH_STATE
+    xor al,al
+    ret
+
+  [[U+003C LESS-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_LESS_THAN_SIGN_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    xor al,al
+    ret
+
+end state
+
+
+state scriptDataEscapedDash,SCRIPT_DATA_ESCAPED_DASH_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_DASH_DASH_STATE
+    xor al,al
+    ret
+
+  [[U+003C LESS-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_LESS_THAN_SIGN_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    xor al,al
+    ret
+
+end state
+
+
+state scriptDataEscapedDashDash,SCRIPT_DATA_ESCAPED_DASH_DASH_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    ; ...
+    xor al,al
+    ret
+
+  [[U+003C LESS-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_LESS_THAN_SIGN_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    xor al,al
+    ret
+
+end state
+
+
+state scriptDataEscapedLessThanSign,SCRIPT_DATA_ESCAPED_LESS_THAN_SIGN_STATE
+
+  [[U+002F SOLIDUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_END_TAG_OPEN_STATE
+    xor al,al
+    ret
+
+  [[ASCII alpha]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPE_START_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state scriptDataEscapedEndTagOpen,SCRIPT_DATA_ESCAPED_END_TAG_OPEN_STATE
+
+  [[ASCII alpha]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_END_TAG_NAME_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state scriptDataEscapedEndTagName,SCRIPT_DATA_ESCAPED_END_TAG_NAME_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[U+002F SOLIDUS]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    ; XXX: goto anything else
+    xor al,al
+    ret
+
+  [[ASCII upper alpha]]
+    ; ...
+    xor al,al
+    ret
+
+  [[ASCII lower alpha]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state scriptDataDoubleEscapeStart,SCRIPT_DATA_DOUBLE_ESCAPE_START_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+  [[U+002F SOLIDUS]]
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    xor al,al
+    ret
+
+  [[ASCII upper alpha]]
+    ; ...
+    xor al,al
+    ret
+
+  [[ASCII lower alpha]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state scriptDataDoubleEscaped,SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_DASH_STATE
+    xor al,al
+    ret
+
+  [[U+003C LESS-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_LESS_THAN_SIGN_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    xor al,al
+    ret
+
+end state
+
+
+state scriptDataDoubleEscapedDash,SCRIPT_DATA_DOUBLE_ESCAPED_DASH_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_DASH_DASH_STATE
+    xor al,al
+    ret
+
+  [[U+003C LESS-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_LESS_THAN_SIGN_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    xor al,al
+    ret
+
+end state
+
+
+state scriptDataDoubleEscapedDashDash,SCRIPT_DATA_DOUBLE_ESCAPED_DASH_DASH_STATE
+
+  [[U+002D HYPHEN-MINUS]]
+    ; ...
+    xor al,al
+    ret
+
+  [[U+003C LESS-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_LESS_THAN_SIGN_STATE
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    xor al,al
+    ret
+
+end state
+
+
+state scriptDataDoubleEscapedLessThanSign,SCRIPT_DATA_DOUBLE_ESCAPED_LESS_THAN_SIGN_STATE
+
+  [[U+002F SOLIDUS]]
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPE_END_STATE
+    xor al,al
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
 ;; ...
 
 state beforeAttributeName,BEFORE_ATTRIBUTE_NAME_STATE
@@ -1073,8 +1588,6 @@ state characterReference,CHARACTER_REFERENCE_STATE
 
   [[U+0023 NUMBER SIGN]]
     ;; append
-public myLabello
-myLabello:
     mov byte [r12 + H5aParser.tokenizer.state], NUMERIC_CHARACTER_REFERENCE_STATE
     xor al,al
     ret
@@ -1209,9 +1722,26 @@ state decimalCharacterReference,DECIMAL_CHARACTER_REFERENCE_STATE
 
 end state
 
-;; ...
+
+if 0
+  state numericCharacterReferenceEnd,NUMERIC_CHARACTER_REFERENCE_END_STATE
+
+    @no_consume
+
+    
+
+    ; ...
+    mov cl, byte [r12 + H5aParser.tokenizer.return_state]
+    mov byte [r12 + H5aParser.tokenizer.state], cl
+    xor al,al
+    ret
+
+  end state
+end if
+
 
 
 section '.rodata'
 generate_tables
+
 
