@@ -114,11 +114,16 @@ macro state? name*,index_name*
     local code, rest
     local seq
     local group
+    local cond
 
     match =end? =state?, line
     jyes finish
-    match =@no_consume?, line
+
+    ;; Properties
+    match =@NoConsume, line
     jyes disable_getchar
+
+    ;; Patterns
     match =[=[=Exactly seq=]=], line
     jyes seq_yescase
     match =[=[=Case=-=insensitively seq=]=], line
@@ -131,6 +136,13 @@ macro state? name*,index_name*
     jyes eof
     match =[=[=Anything =else=]=], line
     jyes any
+
+    ;; Commands
+    match =goto?! =anything_else?, line
+    jyes goto_always
+    match =goto_if?! cond =anything_else?, line
+    jyes goto_if
+
     ;fallthrough
     unknown:
       assemble line
@@ -245,6 +257,16 @@ macro state? name*,index_name*
       compute have_any, 1
       exit
 
+    goto_always:
+      arrange var, =jmp prefix.=any
+      assemble var
+      exit
+
+    goto_if:
+      arrange var, =j#cond prefix.=any
+      assemble var
+      exit
+
     finish:
       arrange val, 1
       call seq_maybe_emit_beyond, val
@@ -296,35 +318,52 @@ macro generate_tables?
   end calminstruction
 
   calminstruction generate_ascii_matrix
-    local var, val, i, j
+    local var, val, i, j, flags
     compute i, 0
 
-    state_loop:
+  state_loop:
       check i < NUM_STATES
       jno finish
       call get_prefix, i
       compute j, 0
 
-      char_loop:
+  char_loop:
         check j <= 0x7F
         jno char_loop_after
+
+        arrange flags, =flagsForIndex.i
+        transform flags
+        jno consuming_state ;XXX: remove at the end
+        ; flags should always exist??
+
+        compute val, (flags and STATE_BIT_NO_GETCHAR)
+        check val > 0
+        jno consuming_state
+
+        arrange var, =dq 0xBEEFCAFE
+        assemble var
+
+        jump char_loop_continue
+
+  consuming_state:
 
         arrange var, prefix.j
         check defined var
         jyes explicitly_defined
           arrange var, prefix.=any
-        explicitly_defined:
+  explicitly_defined:
           arrange var, =dq var
           assemble var
 
+  char_loop_continue:
         compute j, j + 1
         jump char_loop
 
-      char_loop_after:
+  char_loop_after:
         compute i, i + 1
         jump state_loop
 
-    finish:
+  finish:
       exit
   end calminstruction
 
@@ -332,14 +371,31 @@ macro generate_tables?
     local var, i
     compute i, 0
 
-    state_loop:
+  state_loop:
       check i < NUM_STATES
       jno finish
+
+      arrange flags, =flagsForIndex.i
+      transform flags
+      jno consuming_state ;XXX: remove at the end
+      ; flags should always exist??
+
+      compute val, (flags and STATE_BIT_NO_GETCHAR)
+      check val > 0
+      jno consuming_state
+
+      arrange var, =dq 0xBEEFCAFE
+      assemble var
+
+      jump loop_continue
+
+  consuming_state:
       call get_prefix, i
 
       arrange var, =dq prefix.=any
       assemble var
 
+  loop_continue:
       compute i, i + 1
       jump state_loop
 
@@ -351,19 +407,37 @@ macro generate_tables?
     local var, i
     compute i, 0
 
-    state_loop:
-      check i < NUM_STATES
-      jno finish
+  state_loop:
+    check i < NUM_STATES
+    jno finish
+    arrange flags, =flagsForIndex.i
+    transform flags
+    jno consuming_state ;XXX: remove at the end
+    ; flags should always exist??
+
+    compute val, (flags and STATE_BIT_NO_GETCHAR)
+    check val > 0
+    jno consuming_state
+
+    arrange var, =dq 0xBEEFCAFE
+    assemble var
+
+    jump loop_continue
+
+  consuming_state:
+    call get_prefix, i
+
       call get_prefix, i
 
       arrange var, prefix.=eof
       check defined var
       jyes explicitly_defined
         arrange var, prefix.=any
-      explicitly_defined:
+  explicitly_defined:
         arrange var, =dq var
         assemble var
 
+  loop_continue:
       compute i, i + 1
       jump state_loop
 

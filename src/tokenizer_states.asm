@@ -14,6 +14,8 @@ extrn _h5aTokenizerEat
 extrn _h5aTokenizerEatInsensitive
 extrn _h5aTokenizerEmitCharacter
 extrn _h5aTokenizerEmitEof
+extrn _h5aTokenizerHaveAppropriateEndTag
+extrn _CharacterQueuePushFront
 
 public _k_h5a_Tokenizer_flags_table
 public _k_h5a_Tokenizer_common_dispatch_table
@@ -676,20 +678,33 @@ state scriptDataEscapedEndTagName,SCRIPT_DATA_ESCAPED_END_TAG_NAME_STATE
   [[U+000A LINE FEED]]
   [[U+000C FORM FEED]]
   [[U+0020 SPACE]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_NAME_STATE
     xor al,al
     ret
 
   [[U+002F SOLIDUS]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], SELF_CLOSING_START_TAG_STATE
     xor al,al
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    ; XXX: emit
     xor al,al
     ret
 
@@ -919,7 +934,8 @@ state attributeName,ATTRIBUTE_NAME_STATE
   [[U+0027 APOSTROPHE]]
   [[U+003C LESS-THAN SIGN]]
     ; ...
-    ; fallthrough
+    goto! anything_else
+
   [[Anything else]]
     ; append
     xor al,al
@@ -1085,10 +1101,6 @@ state attributeValueUnquoted,ATTRIBUTE_VALUE_UNQUOTED_STATE
     xor al,al
     ret
 
-  [[EOF]]
-    ; ...
-    jmp _h5aTokenizerEmitEof
-
   [[U+0022 QUOTATION MARK]]
   [[U+0027 APOSTROPHE]]
   [[U+003C LESS-THAN SIGN]]
@@ -1096,12 +1108,17 @@ state attributeValueUnquoted,ATTRIBUTE_VALUE_UNQUOTED_STATE
   [[U+0060 GRAVE ACCENT]]
     ; XXX: bad order!
     ; ...
-    ;fallthrough
+    goto! anything_else
+
+  [[EOF]]
+    ; ...
+    jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
     ; ...
     xor al,al
     ret
+
 end state
 
 
@@ -1167,7 +1184,7 @@ end state
 
 state markupDeclarationOpen,MARKUP_DECLARATION_OPEN_STATE
 
-  @no_consume
+  @NoConsume
 
   [[Exactly "--"]]
     ; ...
@@ -1582,8 +1599,17 @@ state characterReference,CHARACTER_REFERENCE_STATE
   ;; clear tmpbuf
 
   [[ASCII alphanumeric]]
+    ;; NOTE: differs from spec. We do not reconsume because "named character reference state"
+    ;; doesn't have single-character actions; it attempts to consume the whole named ref
+    ;; at once, e.g.:
+    ;; "lt;" instead of ("l" THEN "t;") or "&lt;"
+    mov rsi, rdi
+    lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
+    call _CharacterQueuePushFront
     mov byte [r12 + H5aParser.tokenizer.state], NAMED_CHARACTER_REFERENCE_STATE
-    mov al, RESULT_RECONSUME
+
+    ;mov al, RESULT_RECONSUME
+    xor al,al
     ret
 
   [[U+0023 NUMBER SIGN]]
@@ -1600,6 +1626,18 @@ state characterReference,CHARACTER_REFERENCE_STATE
     ret
 
 end state
+
+
+state namedCharacterReference,NAMED_CHARACTER_REFERENCE_STATE
+
+  @NoConsume
+
+  ; ...
+  xor al,al
+  ret
+
+end state
+
 
 ;; ...
 
@@ -1723,21 +1761,19 @@ state decimalCharacterReference,DECIMAL_CHARACTER_REFERENCE_STATE
 end state
 
 
-if 0
-  state numericCharacterReferenceEnd,NUMERIC_CHARACTER_REFERENCE_END_STATE
+state numericCharacterReferenceEnd,NUMERIC_CHARACTER_REFERENCE_END_STATE
 
-    @no_consume
+  @NoConsume
 
-    
+  
 
-    ; ...
-    mov cl, byte [r12 + H5aParser.tokenizer.return_state]
-    mov byte [r12 + H5aParser.tokenizer.state], cl
-    xor al,al
-    ret
+  ; ...
+  mov cl, byte [r12 + H5aParser.tokenizer.return_state]
+  mov byte [r12 + H5aParser.tokenizer.state], cl
+  xor al,al
+  ret
 
-  end state
-end if
+end state
 
 
 

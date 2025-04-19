@@ -23,6 +23,7 @@ public _h5aTokenizerEat
 public _h5aTokenizerEatInsensitive
 public _h5aTokenizerEmitCharacter
 public _h5aTokenizerEmitEof
+public _h5aTokenizerHaveAppropriateEndTag
 public _h5aTokenizerMain
 
 
@@ -168,6 +169,12 @@ _h5aTokenizerEmitEof:
   mov sil, TOKEN_EOF
   call _h5aTokenizerEmitToken
   mov al, RESULT_EOF_REACHED
+  ret
+
+_h5aTokenizerHaveAppropriateEndTag:
+  ;; R12 (s): H5aParser *parser
+  ;; -> RAX (AL): bool result
+  xor rax,rax
   ret
 
 public _h5aTokenizerPrefetchChars

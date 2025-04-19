@@ -14,6 +14,7 @@ extrn free
 
 public _CharacterQueueConstruct
 public _CharacterQueueDestroy
+public _CharacterQueuePushFront
 public _CharacterQueuePushBack
 public _CharacterQueuePopFront
 public _CharacterQueueSubscript
@@ -65,10 +66,42 @@ _CharacterQueueGrow:
   ;; XXX ...
   ret
 
+
+_CharacterQueuePushFront:
+;; RDI: _NonNull CharacterQueue *queue
+;; ESI: char32_t c
+;; -> EAX: char32_t c
+  mov ecx, dword [rdi + CharacterQueue.size]
+  cmp ecx, [rdi + CharacterQueue.capacity]
+  jne .noGrow
+
+  with_saved_regs rdi, rsi
+    call _CharacterQueueGrow
+  end with_saved_regs
+
+.noGrow:
+  xor rcx,rcx
+  mov ecx, dword [rdi + CharacterQueue.front_idx]
+  mov rax, qword [rdi + CharacterQueue.data]
+
+  test ecx,ecx
+  jnz .inRange
+
+  mov ecx, dword [rdi + CharacterQueue.capacity]
+  dec ecx
+
+.inRange:
+  mov dword [rax + rcx * 4], esi
+  mov dword [rdi + CharacterQueue.front_idx], ecx
+  xor rax,rax
+  mov eax,edi
+  ret
+
+
 _CharacterQueuePushBack:
 ;; RDI: _NonNull CharacterQueue *queue
 ;; ESI: char32_t c
-;; -> EAX: char32_t
+;; -> EAX: char32_t c
   mov ecx, dword [rdi + CharacterQueue.size]
   cmp ecx, [rdi + CharacterQueue.capacity]
   jne .noGrow
