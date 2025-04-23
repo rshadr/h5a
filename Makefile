@@ -11,6 +11,7 @@ CFLAGS += -I./include
 
 SOURCES =\
 	character_queue\
+	entities\
 	parser\
 	tokenizer\
 	tokenizer_states\
@@ -48,12 +49,30 @@ build/%.o: src/%.asm
 	@mkdir -p $(@D)
 	$(FASM2) -v 2 $< $@
 
+build/%.o: gen/%.asm
+	@mkdir -p $(@D)
+	$(FASM2) -v 2 $< $@
+
+build/tools/%: tools/%.cc
+	@mkdir -p $(@D)
+	$(CXX) -o $@ -MMD $(CXXFLAGS) $<
+
+gen/entities.asm: ext/entities.json build/tools/gen_entities
+	@mkdir -p $(@D)
+	build/tools/gen_entities ext/entities.json > $@
+
 build/test/%: test/%.c build/libh5a.a
 	@mkdir -p $(@D)
 	$(CC) -o $@ -MMD $(CFLAGS) $< -L./build -lh5a -lgrapheme
 
+ext/entities.json:
+	@mkdir -p $(@D)
+	curl "https://html.spec.whatwg.org/entities.json" -o $@
+
 clean:
 	rm -rf build
+	rm -rf ext
+	rm -rf gen
 
 .PHONY: all clean
 

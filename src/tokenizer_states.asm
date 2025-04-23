@@ -10,12 +10,17 @@ include "tokenizer_states.g"
 
 format ELF64
 
+extrn _h5aTokenizerPrefetchChars
 extrn _h5aTokenizerEat
 extrn _h5aTokenizerEatInsensitive
 extrn _h5aTokenizerEmitCharacter
 extrn _h5aTokenizerEmitEof
 extrn _h5aTokenizerHaveAppropriateEndTag
 extrn _CharacterQueuePushFront
+
+extrn _k_h5a_entityTable
+extrn _k_h5a_entityValues
+extrn _k_h5a_numEntities
 
 public _k_h5a_Tokenizer_flags_table
 public _k_h5a_Tokenizer_common_dispatch_table
@@ -307,20 +312,32 @@ state rcdataEndTagName,RCDATA_END_TAG_NAME_STATE
   [[U+000A LINE FEED]]
   [[U+000C FORM FEED]]
   [[U+0020 SPACE]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_NAME_STATE
     xor al,al
     ret
 
   [[U+002F SOLIDUS]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], SELF_CLOSING_START_TAG_STATE
     xor al,al
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
     xor al,al
     ret
 
@@ -383,20 +400,32 @@ state rawtextEndTagName,RAWTEXT_END_TAG_NAME_STATE
   [[U+000A LINE FEED]]
   [[U+000C FORM FEED]]
   [[U+0020 SPACE]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_NAME_STATE
     xor al,al
     ret
 
   [[U+002F SOLIDUS]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], SELF_CLOSING_START_TAG_STATE
     xor al,al
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
     xor al,al
     ret
 
@@ -465,20 +494,32 @@ state scriptDataEndTagName,SCRIPT_DATA_END_TAG_NAME_STATE
   [[U+000A LINE FEED]]
   [[U+000C FORM FEED]]
   [[U+0020 SPACE]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_NAME_STATE
     xor al,al
     ret
 
   [[U+002F SOLIDUS]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], SELF_CLOSING_START_TAG_STATE
     xor al,al
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    ; ...
-    ; XXX: goto anything else
+    call _h5aTokenizerHaveAppropriateEndTag
+    test al,al
+
+    goto_if! z anything_else
+
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
     xor al,al
     ret
 
@@ -1632,8 +1673,37 @@ state namedCharacterReference,NAMED_CHARACTER_REFERENCE_STATE
 
   @NoConsume
 
-  ; ...
+entity_resolve:
+
+  with_saved_regs rbx, r13, r14
+    lea rbx, [_k_h5a_entityTable]
+    xor r13,r13
+    xor r14,r14
+    mov r14d, dword [_k_h5a_numEntities]
+
+.loop:
+    cmp r13, r14
+    unlikely jge .no_match
+
+    xor rdi,rdi
+    mov rcx, r13
+    shl rcx, 1
+    mov edi, dword [rbx + rcx * 8 + 4]
+    call _h5aTokenizerPrefetchChars
+    ; ...
+    ; call _h5aTokenizerEatInsensitive
+
+    inc r13
+    jmp .loop
+
+.match:
+
+.no_match:
+  ;fallthrough
+
+.finish:
   xor al,al
+  end with_saved_regs
   ret
 
 end state
@@ -1765,7 +1835,7 @@ state numericCharacterReferenceEnd,NUMERIC_CHARACTER_REFERENCE_END_STATE
 
   @NoConsume
 
-  
+
 
   ; ...
   mov cl, byte [r12 + H5aParser.tokenizer.return_state]
