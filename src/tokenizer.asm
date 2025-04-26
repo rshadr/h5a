@@ -2,7 +2,7 @@
 ;;;; Copyright 2025 rshadr
 ;;;; See LICENSE for details
 ;;;;
-
+include 'align.inc'
 include 'macro/struct.inc'
 include "util.inc"
 include "local.inc"
@@ -24,6 +24,8 @@ public _h5aTokenizerEatInsensitive
 public _h5aTokenizerEmitCharacter
 public _h5aTokenizerEmitEof
 public _h5aTokenizerHaveAppropriateEndTag
+public _h5aTokenizerFlushEntityChars
+public _h5aTokenizerCharRefInAttr
 public _h5aTokenizerMain
 
 
@@ -59,7 +61,8 @@ _h5aTokenizerEatGeneric:
   ;; RDI (a): char8 const *str
   ;; RSI (a): u64 len
   ;; RDX (a): __xabi__ char32 (*filter) (char32 c)
-  with_saved_regs rdi, rsi, rdx
+  with_saved_regs rdi, rsi, rdx, rcx
+    ; RCX for stack alignment
     mov rdi, rsi
     call _h5aTokenizerPrefetchChars
   end with_saved_regs
@@ -177,6 +180,23 @@ _h5aTokenizerHaveAppropriateEndTag:
   xor rax,rax
   ret
 
+_h5aTokenizerFlushEntityChars:
+  ;; R12 (s): H5aParser *parser
+  ;; -> void
+  ret
+
+_h5aTokenizerCharRefInAttr:
+  ;; R12 (s): H5aParser *parser
+  ;; -> RAX (AL): bool result
+  xor rax,rax
+
+  ; XXX: USELESS!!
+
+.yes:
+  mov al, 1
+.no:
+  ret
+
 public _h5aTokenizerPrefetchChars
 _h5aTokenizerPrefetchChars:
 ;; R12 (omni): H5aParser *parser
@@ -192,6 +212,7 @@ _h5aTokenizerPrefetchChars:
 
 .inputLeft:
 
+  push rax ;stack-align
   push rbx ;count store
   push rdx ;char store
   push r13 ;zero store
@@ -213,7 +234,8 @@ _h5aTokenizerPrefetchChars:
   test al, cl
   jz .noWaitingCarriage
 
-  with_saved_regs rdx
+  with_saved_regs rdx, rax
+    ; also push RAX for stack-align
     lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
     xor rsi,rsi
     mov sil, 0x0A
@@ -248,6 +270,7 @@ _h5aTokenizerPrefetchChars:
   pop r13
   pop rdx
   pop rbx
+  pop rax ;stack-align
   ret
 
 .noEof:
@@ -369,6 +392,13 @@ _h5aTokenizerMain:
     pop rbx
     pop r10
     pop r12 ;upscope
-    xor eax,eax
+    pop rax ;upscope / stack-align
+    xor rax,rax
     ret
 
+
+section '.rodata'
+
+myLabel:
+align 8
+dq 0x00, 0x00

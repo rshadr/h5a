@@ -65,13 +65,8 @@ build/test/%: test/%.c build/libh5a.a
 	@mkdir -p $(@D)
 	$(CC) -o $@ -MMD $(CFLAGS) $< -L./build -lh5a -lgrapheme
 
-ext/entities.json:
-	@mkdir -p $(@D)
-	curl "https://html.spec.whatwg.org/entities.json" -o $@
-
 clean:
 	rm -rf build
-	rm -rf ext
 	rm -rf gen
 
 .PHONY: all clean

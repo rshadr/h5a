@@ -64,6 +64,7 @@ h5aDestroyParser:
 h5aResumeParser:
 ;; RDI: H5aParser *parser
 ;; -> [see _h5a_Tokenizer_main]
+  push rax ; 16b stack-align
   push r12
   mov  r12, rdi
   ;lea  rax, [_h5aTokenizerMain]

@@ -1673,7 +1673,7 @@ state namedCharacterReference,NAMED_CHARACTER_REFERENCE_STATE
 
   @NoConsume
 
-entity_resolve:
+named_resolve:
 
   with_saved_regs rbx, r13, r14
     lea rbx, [_k_h5a_entityTable]
@@ -1685,24 +1685,35 @@ entity_resolve:
     cmp r13, r14
     unlikely jge .no_match
 
-    xor rdi,rdi
     mov rcx, r13
     shl rcx, 1
-    mov edi, dword [rbx + rcx * 8 + 4]
-    call _h5aTokenizerPrefetchChars
-    ; ...
-    ; call _h5aTokenizerEatInsensitive
+    mov rdi, qword [rbx + rcx * 8 + 0]
+    xor rsi,rsi
+    mov esi, dword [rbx + rcx * 8 + 4]
+    call _h5aTokenizerEatInsensitive
+    test al,al
+    jnz .match
 
     inc r13
     jmp .loop
 
 .match:
+    ; ...
+    mov cl, byte [r12 + H5aParser.tokenizer.return_state]
+    mov byte [r12 + H5aParser.tokenizer.state], cl
+    jmp .finish
+
+.matchNotLegacy:
+    mov cl, byte [r12 + H5aParser.tokenizer.return_state]
+    mov byte [r12 + H5aParser.tokenizer.state], cl
+    jmp .finish
 
 .no_match:
-  ;fallthrough
-
+    ; ...
+    mov byte [r12 + H5aParser.tokenizer.state], AMBIGUOUS_AMPERSAND_STATE
+    ;fallthrough
 .finish:
-  xor al,al
+    xor al,al
   end with_saved_regs
   ret
 
@@ -1835,7 +1846,7 @@ state numericCharacterReferenceEnd,NUMERIC_CHARACTER_REFERENCE_END_STATE
 
   @NoConsume
 
-
+numeric_resolve:
 
   ; ...
   mov cl, byte [r12 + H5aParser.tokenizer.return_state]

@@ -7,3 +7,4 @@ build/
 massif.out.*
 perf.*
 *.html
+gen/
