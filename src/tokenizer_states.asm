@@ -12,6 +12,7 @@ format ELF64
 
 extrn _h5aTokenizerPrefetchChars
 extrn _h5aTokenizerEat
+extrn _h5aTokenizerEatSensitive
 extrn _h5aTokenizerEatInsensitive
 extrn _h5aTokenizerEmitCharacter
 extrn _h5aTokenizerEmitEof
@@ -1672,10 +1673,13 @@ end state
 state namedCharacterReference,NAMED_CHARACTER_REFERENCE_STATE
 
   @NoConsume
+  @SpecialAction
 
+public named_resolve
 named_resolve:
 
-  with_saved_regs rbx, r13, r14
+  with_saved_regs rbx, r13, r14, rcx
+    ; push RCX for stack alignment
     lea rbx, [_k_h5a_entityTable]
     xor r13,r13
     xor r14,r14
@@ -1686,11 +1690,11 @@ named_resolve:
     unlikely jge .no_match
 
     mov rcx, r13
-    shl rcx, 1
-    mov rdi, qword [rbx + rcx * 8 + 0]
+    shl rcx, (bsr (8 + 4 + 4))
+    mov rdi, qword [rbx + rcx + 0]
     xor rsi,rsi
-    mov esi, dword [rbx + rcx * 8 + 4]
-    call _h5aTokenizerEatInsensitive
+    mov esi, dword [rbx + rcx + 8]
+    call _h5aTokenizerEatSensitive
     test al,al
     jnz .match
 
@@ -1713,8 +1717,8 @@ named_resolve:
     mov byte [r12 + H5aParser.tokenizer.state], AMBIGUOUS_AMPERSAND_STATE
     ;fallthrough
 .finish:
-    xor al,al
   end with_saved_regs
+  xor al,al
   ret
 
 end state

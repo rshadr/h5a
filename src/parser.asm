@@ -24,16 +24,15 @@ section '.text' executable
 h5aCreateParser:
 ;; RDI: H5aParserCreateInfo *create_info
 ;; RSI: H5aParser *parser
-  push rdi
-  push rsi
+  push rbp
+  mov rbp, rsp
 
-  mov rdi, rsi
-  xor al,al
-  mov rcx, sizeof.H5aParser
-  rep stosb
-
-  pop rsi
-  pop rdi
+  with_saved_regs rdi, rsi
+    mov rdi, rsi
+    xor al,al
+    mov rcx, sizeof.H5aParser
+    rep stosb
+  end with_saved_regs
 
   mov rax, qword [rdi + H5aParserCreateInfo.get_char]
   mov qword [rsi + H5aParser.input_stream.get_char_cb], rax
@@ -49,6 +48,8 @@ h5aCreateParser:
   ;mov qword [rsi + H5aParser.treebuilder.mode], 0
 
   mov eax, H5A_SUCCESS
+
+  leave
   ret
 
 h5aDestroyParser:
@@ -64,7 +65,6 @@ h5aDestroyParser:
 h5aResumeParser:
 ;; RDI: H5aParser *parser
 ;; -> [see _h5a_Tokenizer_main]
-  push rax ; 16b stack-align
   push r12
   mov  r12, rdi
   ;lea  rax, [_h5aTokenizerMain]
@@ -75,3 +75,4 @@ section '.rodata'
 
 k_h5a_parserSize:
   dq sizeof.H5aParser
+

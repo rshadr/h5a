@@ -122,6 +122,8 @@ macro state? name*,index_name*
     ;; Properties
     match =@NoConsume, line
     jyes disable_getchar
+    match =@SpecialAction, line
+    jyes enable_spcaction
 
     ;; Patterns
     match =[=[=Exactly seq=]=], line
@@ -151,6 +153,10 @@ macro state? name*,index_name*
     disable_getchar:
       compute enable_getchar, 0
       compute flags, (flags or STATE_BIT_NO_GETCHAR)
+      exit
+
+    enable_spcaction:
+      compute flags, (flags or STATE_BIT_SPC_ACTION)
       exit
 
     seq_yescase:

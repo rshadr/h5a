@@ -1,6 +1,6 @@
 ;;;;
-;;;;
-;;;;
+;;;; Copyright 2025 rshadr
+;;;; See LICENSE for details
 ;;;;
 
 include 'macro/struct.inc'
@@ -52,18 +52,26 @@ _CharacterQueueConstruct:
   ret
 
 _CharacterQueueDestroy:
+  push rbp
+  mov rbp, rsp
+
   with_saved_regs rdi
     mov rdi, [rdi + CharacterQueue.data]
     call qword [free_cb]
   end with_saved_regs
 
   ;zero_init rdi, sizeof.CharacterQueue
+
+  leave
   ret
 
 _CharacterQueueGrow:
   ;; RDI: _NonNull CharacterQueue *queue
   ;; -> void
+  push rbp
+  mov rbp, rsp
   ;; XXX ...
+  leave
   ret
 
 
@@ -71,9 +79,12 @@ _CharacterQueuePushFront:
 ;; RDI: _NonNull CharacterQueue *queue
 ;; ESI: char32_t c
 ;; -> EAX: char32_t c
+  push rbp
+  mov rbp, rsp
+
   mov ecx, dword [rdi + CharacterQueue.size]
   cmp ecx, [rdi + CharacterQueue.capacity]
-  jne .noGrow
+  jl .noGrow
 
   with_saved_regs rdi, rsi
     call _CharacterQueueGrow
@@ -85,16 +96,19 @@ _CharacterQueuePushFront:
   mov rax, qword [rdi + CharacterQueue.data]
 
   test ecx,ecx
-  jnz .inRange
+  jnz .inRange ;front_idx > 0
 
   mov ecx, dword [rdi + CharacterQueue.capacity]
+.inRange:
   dec ecx
 
-.inRange:
   mov dword [rax + rcx * 4], esi
   mov dword [rdi + CharacterQueue.front_idx], ecx
+  inc dword [rdi + CharacterQueue.size]
   xor rax,rax
-  mov eax,edi
+  mov eax,esi
+
+  leave
   ret
 
 
@@ -102,6 +116,9 @@ _CharacterQueuePushBack:
 ;; RDI: _NonNull CharacterQueue *queue
 ;; ESI: char32_t c
 ;; -> EAX: char32_t c
+  push rbp
+  mov rbp, rsp
+
   mov ecx, dword [rdi + CharacterQueue.size]
   cmp ecx, [rdi + CharacterQueue.capacity]
   jne .noGrow
@@ -125,19 +142,26 @@ _CharacterQueuePushBack:
 
   xor rax,rax
   mov eax, edi
+
+  leave
   ret
 
 
 _CharacterQueuePopFront:
   ;; RDI: _NonNull CharacterQueue *queue
-  ;; -> EAX: char32_t c
-  ;; -> RDX: bool status
+  ;; -> RAX (EAX): char32_t c
+  ;; -> RDX (DL): bool status
+  push rbp
+  mov rbp, rsp
+
   mov ecx, dword [rdi + CharacterQueue.size]
   test ecx,ecx
   jnz .haveData
 
   xor rax,rax
   xor rdx,rdx
+
+  leave
   ret
 
 .haveData:
@@ -159,6 +183,8 @@ _CharacterQueuePopFront:
   mov rdx, 1
   ; no need to upper-clear
   mov eax, r8d
+
+  leave
   ret
 
 
@@ -177,7 +203,11 @@ _CharacterQueueSubscript:
   mov rdx, qword [rdi + CharacterQueue.data]
 
   mov ecx, dword [rdi + CharacterQueue.capacity]
-  sub ecx, dword [rdi + CharacterQueue.front_idx]
+
+  ;sub ecx, dword [rdi + CharacterQueue.front_idx]
+  mov eax, dword [rdi + CharacterQueue.front_idx]
+  sub ecx, eax
+
   cmp esi, ecx
   jge .lateSlice
   ;; [c c c 0 0 0 c c]

@@ -9,6 +9,11 @@ nor incredibly optimized in any way. It is rather a testing ground
 for things I have wanted to try for a long time and also my first
 (hopefully) complete assembly project.
 
+## Requirements
+- fasm2
+- libc
+- AVX2
+
 ## Status
 - Tokenizer: partially implemented
 - Tree builder: not working

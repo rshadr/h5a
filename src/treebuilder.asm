@@ -12,4 +12,10 @@ section '.text' executable
 
 _h5aTreeBuilderAcceptToken:
   ;; -> void
+  push rbp
+  mov rbp, rsp
+
+  
+
+  leave
   ret

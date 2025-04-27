@@ -20,6 +20,7 @@ extrn _CharacterQueueSubscript
 
 public _h5aTokenizerError
 public _h5aTokenizerEat
+public _h5aTokenizerEatSensitive
 public _h5aTokenizerEatInsensitive
 public _h5aTokenizerEmitCharacter
 public _h5aTokenizerEmitEof
@@ -61,6 +62,9 @@ _h5aTokenizerEatGeneric:
   ;; RDI (a): char8 const *str
   ;; RSI (a): u64 len
   ;; RDX (a): __xabi__ char32 (*filter) (char32 c)
+  push rbp
+  mov rbp, rsp
+
   with_saved_regs rdi, rsi, rdx, rcx
     ; RCX for stack alignment
     mov rdi, rsi
@@ -111,6 +115,7 @@ _h5aTokenizerEatGeneric:
   pop r13
   pop rbx
   xor al,al
+  leave
   ret
 
 .success:
@@ -134,10 +139,12 @@ _h5aTokenizerEatGeneric:
   pop rbx
 
   mov al, 1
+  leave
   ret
 
 .fail:
   xor al,al
+  leave
   ret
 
 _h5aTokenizerEat:
@@ -154,47 +161,109 @@ _h5aTokenizerEatInsensitive:
   lea rdx, [_h5aTokenizerEatFilterCase]
   jmp _h5aTokenizerEatGeneric
 
+_h5aTokenizerEatSensitive:
+  lea rdx, [_h5aTokenizerEatFilterNone]
+  jmp _h5aTokenizerEatGeneric
+
 _h5aTokenizerEmitToken:
+  ;; R12 (s): H5aParser *parser
+  ;; RDI (a): union Token token
+  ;; RSI (a): e8 type
+  push rbp
+  mov rbp, rsp
+
   ;; ...
   xor al,al
+
+  leave
   ret
 
 _h5aTokenizerEmitCharacter:
 ;; R12 (s): H5aParser *parser
+;; RDI (EDI): char32_t c
 ;; -> void
+  xor esi,esi
+  xor eax,eax
+  mov sil, TOKEN_CHARACTER
+  mov al, TOKEN_WHITESPACE
+
+  push rdi
+  vpbroadcastd xmm1, dword [rsp + 8]
+  pop rdi
+  movdqa xmm2, xmm1
+  movapd xmm1, [_k_h5a_whitespaceSet] ;oword
+  pcmpeqd xmm1, xmm2
+  ptest xmm1,xmm1
+
+  cmove si, ax
+
   jmp _h5aTokenizerEmitToken
 
 _h5aTokenizerEmitEof:
   ;; R12 (s): H5aParser *parser
   ;; [...]
   ;; -> uint8 status
+  push rbp
+  mov rbp, rsp
+
   xor edi,edi
   mov sil, TOKEN_EOF
   call _h5aTokenizerEmitToken
   mov al, RESULT_EOF_REACHED
+
+  leave
   ret
 
 _h5aTokenizerHaveAppropriateEndTag:
   ;; R12 (s): H5aParser *parser
   ;; -> RAX (AL): bool result
+  push rbp
+  mov rbp, rsp
+  ;...
   xor rax,rax
+  leave
   ret
 
 _h5aTokenizerFlushEntityChars:
   ;; R12 (s): H5aParser *parser
   ;; -> void
+  push rbp
+  mov rbp, rsp
+
+with_saved_regs r8, rbx
+    call _h5aTokenizerCharRefInAttr
+    mov r8b, al
+
+.loop:
+    mov eax, dword [r12 + H5aParser.tokenizer.input_buffer + CharacterQueue.size]
+    test eax,eax
+    jz .finish
+
+    
+
+    jmp .loop
+
+.finish:
+end with_saved_regs
+  leave
   ret
 
 _h5aTokenizerCharRefInAttr:
   ;; R12 (s): H5aParser *parser
   ;; -> RAX (AL): bool result
   xor rax,rax
+  mov cl, byte [r12 + H5aParser.tokenizer.state]
 
-  ; XXX: USELESS!!
+  cmp cl, ATTRIBUTE_VALUE_DOUBLE_QUOTED_STATE
+  je .yes
+  cmp cl, ATTRIBUTE_VALUE_SINGLE_QUOTED_STATE
+  je .yes
+  cmp cl, ATTRIBUTE_VALUE_UNQUOTED_STATE
+  je .yes
+  ret
 
 .yes:
   mov al, 1
-.no:
   ret
 
 public _h5aTokenizerPrefetchChars
@@ -212,16 +281,19 @@ _h5aTokenizerPrefetchChars:
 
 .inputLeft:
 
-  push rax ;stack-align
+  push rcx ;stack-align
   push rbx ;count store
   push rdx ;char store
   push r13 ;zero store
   xor rbx,rbx
   mov ebx, edi
   mov r13b, 1
+  ;;sub ebx, dword [r12 + H5aParser.tokenizer.input_buffer + CharacterQueue.size]
 
 .loop:
-  cmp dword [r12 + H5aParser.tokenizer.input_buffer + CharacterQueue.size], ebx
+  ;cmp dword [r12 + H5aParser.tokenizer.input_buffer + CharacterQueue.size], ebx
+  mov ecx, dword [r12 + H5aParser.tokenizer.input_buffer + CharacterQueue.size]
+  cmp ecx, ebx
   jge .finish
 
   mov rdi, qword [r12 + H5aParser.input_stream.user_data]
@@ -234,8 +306,8 @@ _h5aTokenizerPrefetchChars:
   test al, cl
   jz .noWaitingCarriage
 
-  with_saved_regs rdx, rax
-    ; also push RAX for stack-align
+  with_saved_regs rdx, rcx
+    ; also push RCX for stack-align
     lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
     xor rsi,rsi
     mov sil, 0x0A
@@ -270,7 +342,7 @@ _h5aTokenizerPrefetchChars:
   pop r13
   pop rdx
   pop rbx
-  pop rax ;stack-align
+  pop rcx ;stack-align
   ret
 
 .noEof:
@@ -329,8 +401,9 @@ _h5aTokenizerMain:
       jmp .charLoop
       
 .charLoop.readChar:
-      mov  rdi, qword [r12 + H5aParser.input_stream.user_data]
-      call qword [r12 + H5aParser.input_stream.get_char_cb]
+      ;;mov  rdi, qword [r12 + H5aParser.input_stream.user_data]
+      ;;call qword [r12 + H5aParser.input_stream.get_char_cb]
+      call _h5aTokenizerGetChar
       mov  r10d, eax
 
 .charLoop.hashChar:
@@ -392,13 +465,13 @@ _h5aTokenizerMain:
     pop rbx
     pop r10
     pop r12 ;upscope
-    pop rax ;upscope / stack-align
     xor rax,rax
     ret
 
 
 section '.rodata'
 
-myLabel:
 align 8
-dq 0x00, 0x00
+dq 0xCAFECAFECAFECAFE
+_k_h5a_whitespaceSet:
+dd 0x0009, 0x000A, 0x000C, 0x000D
