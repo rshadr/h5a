@@ -15,7 +15,8 @@ SOURCES =\
 	parser\
 	tokenizer\
 	tokenizer_states\
-	treebuilder
+	treebuilder\
+	unicode
 
 OBJS = $(patsubst %, build/%.o, $(SOURCES))
 

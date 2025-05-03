@@ -18,6 +18,8 @@ extrn _h5aTokenizerEmitCharacter
 extrn _h5aTokenizerEmitEof
 extrn _h5aTokenizerHaveAppropriateEndTag
 extrn _CharacterQueuePushFront
+extrn unicodeIsSurrogate
+extrn unicodeIsNonCharacter
 
 extrn _k_h5a_entityTable
 extrn _k_h5a_entityValues
@@ -53,6 +55,8 @@ state data,DATA_STATE
 
   [[U+0000 NULL]]
     ; XXX: error
+    mov rdi, r10
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -61,6 +65,7 @@ state data,DATA_STATE
     ret
 
   [[Anything else]]
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -90,6 +95,7 @@ state rcdata,RCDATA_STATE
 
   [[Anything else]]
     ; ...
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -105,6 +111,9 @@ state rawtext,RAWTEXT_STATE
 
   [[U+0000 NULL]]
     ; ...
+    xor edi,edi
+    mov di, 0xFFFD
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -112,7 +121,7 @@ state rawtext,RAWTEXT_STATE
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -128,6 +137,9 @@ state scriptData,SCRIPT_DATA_STATE
 
   [[U+0000 NULL]]
     ; ...
+    xor edi,edi
+    mov di, 0xFFFD
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -135,7 +147,7 @@ state scriptData,SCRIPT_DATA_STATE
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -144,8 +156,11 @@ end state
 
 state plaintext,PLAINTEXT_STATE
 
-  [[U+000 NULL]]
+  [[U+0000 NULL]]
     ; ...
+    xor edi,edi
+    mov di, 0xFFFD
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -153,7 +168,7 @@ state plaintext,PLAINTEXT_STATE
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -219,6 +234,12 @@ state endTagOpen,END_TAG_OPEN_STATE
 
   [[EOF]]
     ; ...
+    xor edi,edi
+    mov dil, '<'
+    call _h5aTokenizerEmitCharacter
+    xor edi,edi
+    mov dil, '/'
+    call _h5aTokenizerEmitCharacter
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
@@ -370,7 +391,9 @@ state rawtextLessThanSign,RAWTEXT_LESS_THAN_SIGN_STATE
     ret
 
   [[Anything else]]
-    ; ...
+    xor edi,edi
+    mov dil, '<'
+    call _h5aTokenizerEmitCharacter
     mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_STATE
     mov al, RESULT_RECONSUME
     ret
@@ -387,7 +410,12 @@ state rawtextEndTagOpen,RAWTEXT_END_TAG_OPEN_STATE
     ret
 
   [[Anything else]]
-    ; ...
+    xor edi,edi
+    mov dil, '<'
+    call _h5aTokenizerEmitCharacter
+    xor edi,edi
+    mov dil, '/'
+    call _h5aTokenizerEmitCharacter
     mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_STATE
     mov al, RESULT_RECONSUME
     ret
@@ -458,13 +486,20 @@ state scriptDataLessThanSign,SCRIPT_DATA_LESS_THAN_SIGN_STATE
     ret
 
   [[U+0021 EXCLAMATION MARK]]
-    ; ...
+    xor edi,edi
+    mov dil, '<'
+    call _h5aTokenizerEmitCharacter
+    xor edi,edi
+    mov dil, '!'
+    call _h5aTokenizerEmitCharacter
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPE_START_STATE
     xor al,al
     ret
 
   [[Anything else]]
-    ; ...
+    xor edi,edi
+    mov dil, '<'
+    call _h5aTokenizerEmitCharacter
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
     mov al, RESULT_RECONSUME
     ret
@@ -481,7 +516,12 @@ state scriptDataEndTagOpen,SCRIPT_DATA_END_TAG_OPEN_STATE
     ret
 
   [[Anything else]]
-    ; ...
+    xor edi,edi
+    mov dil, '<'
+    call _h5aTokenizerEmitCharacter
+    xor edi,edi
+    mov dil, '/'
+    call _h5aTokenizerEmitCharacter
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
     mov al, RESULT_RECONSUME
     ret
@@ -546,7 +586,9 @@ end state
 state scriptDataEscapeStart,SCRIPT_DATA_ESCAPE_START_STATE
 
   [[U+002D HYPHEN-MINUS]]
-    ; ...
+    xor edi,edi
+    mov dil, '-'
+    call _h5aTokenizerEmitCharacter
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPE_START_DASH_STATE
     xor al,al
     ret
@@ -562,7 +604,9 @@ end state
 state scriptDataEscapeStartDash,SCRIPT_DATA_ESCAPE_START_DASH_STATE
 
   [[U+002D HYPHEN-MINUS]]
-    ; ...
+    xor edi,edi
+    mov dil, '-'
+    call _h5aTokenizerEmitCharacter
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_DASH_DASH_STATE
     xor al,al
     ret
@@ -578,7 +622,9 @@ end state
 state scriptDataEscaped,SCRIPT_DATA_ESCAPED_STATE
 
   [[U+002D HYPHEN-MINUS]]
-    ; ...
+    xor edi,edi
+    mov dil, '-'
+    call _h5aTokenizerEmitCharacter
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_DASH_STATE
     xor al,al
     ret
@@ -590,6 +636,9 @@ state scriptDataEscaped,SCRIPT_DATA_ESCAPED_STATE
 
   [[U+0000 NULL]]
     ; ...
+    xor edi,edi
+    mov di, 0xFFFD
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -598,7 +647,7 @@ state scriptDataEscaped,SCRIPT_DATA_ESCAPED_STATE
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -621,6 +670,9 @@ state scriptDataEscapedDash,SCRIPT_DATA_ESCAPED_DASH_STATE
   [[U+0000 NULL]]
     ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    xor edi,edi
+    mov di, 0xFFFD
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -629,8 +681,8 @@ state scriptDataEscapedDash,SCRIPT_DATA_ESCAPED_DASH_STATE
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -640,8 +692,12 @@ end state
 state scriptDataEscapedDashDash,SCRIPT_DATA_ESCAPED_DASH_DASH_STATE
 
   [[U+002D HYPHEN-MINUS]]
-    ; ...
-    xor al,al
+    with_saved_regs rcx
+      xor edi,edi
+      mov dil, '-'
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_saved_regs
     ret
 
   [[U+003C LESS-THAN SIGN]]
@@ -650,14 +706,21 @@ state scriptDataEscapedDashDash,SCRIPT_DATA_ESCAPED_DASH_DASH_STATE
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
-    xor al,al
+    with_saved_regs rcx
+      mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
+      xor edi,edi
+      mov dil, '>'
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_saved_regs
     ret
 
   [[U+0000 NULL]]
     ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+    xor edi,edi
+    mov di, 0xFFFD
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -666,9 +729,11 @@ state scriptDataEscapedDashDash,SCRIPT_DATA_ESCAPED_DASH_DASH_STATE
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
-    xor al,al
+    with_saved_regs rcx ;arity
+      mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_saved_regs ;arity
     ret
 
 end state
@@ -684,14 +749,23 @@ state scriptDataEscapedLessThanSign,SCRIPT_DATA_ESCAPED_LESS_THAN_SIGN_STATE
 
   [[ASCII alpha]]
     ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPE_START_STATE
-    mov al, RESULT_RECONSUME
+    with_saved_regs rcx ;arity
+      mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPE_START_STATE
+      xor edi,edi
+      mov dil, '<'
+      call _h5aTokenizerEmitCharacter
+      mov al, RESULT_RECONSUME
+    end with_saved_regs
     ret
 
   [[Anything else]]
-    ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
-    mov al, RESULT_RECONSUME
+    with_saved_regs rcx ;arity
+      xor edi,edi
+      mov dil, '<'
+      call _h5aTokenizerEmitCharacter
+      mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+      mov al, RESULT_RECONSUME
+    end with_saved_regs
     ret
 
 end state
@@ -701,14 +775,23 @@ state scriptDataEscapedEndTagOpen,SCRIPT_DATA_ESCAPED_END_TAG_OPEN_STATE
 
   [[ASCII alpha]]
     ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_END_TAG_NAME_STATE
-    mov al, RESULT_RECONSUME
+    with_saved_regs rcx ;arity
+      mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_END_TAG_NAME_STATE
+      mov al, RESULT_RECONSUME
+    end with_saved_regs
     ret
 
   [[Anything else]]
-    ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
-    mov al, RESULT_RECONSUME
+    with_saved_regs rcx ;arity
+      xor edi,edi
+      mov dil, '<'
+      call _h5aTokenizerEmitCharacter
+      xor edi,edi
+      mov dil, '/'
+      call _h5aTokenizerEmitCharacter
+      mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
+      mov al, RESULT_RECONSUME
+    end with_saved_regs
     ret
 
 end state
@@ -720,7 +803,9 @@ state scriptDataEscapedEndTagName,SCRIPT_DATA_ESCAPED_END_TAG_NAME_STATE
   [[U+000A LINE FEED]]
   [[U+000C FORM FEED]]
   [[U+0020 SPACE]]
-    call _h5aTokenizerHaveAppropriateEndTag
+    with_saved_regs rcx ;arity
+      call _h5aTokenizerHaveAppropriateEndTag
+    end with_saved_regs
     test al,al
 
     goto_if! z anything_else
@@ -777,18 +862,32 @@ state scriptDataDoubleEscapeStart,SCRIPT_DATA_DOUBLE_ESCAPE_START_STATE
   [[U+0020 SPACE]]
   [[U+002F SOLIDUS]]
   [[U+003E GREATER-THAN SIGN]]
-    ; ...
+    xor al,al ; ...
+    xor dx,dx
+    xor cx,cx
+    mov dl, SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    mov cl, SCRIPT_DATA_ESCAPED_STATE
+    test al,al
+    cmovz cx, dx ;XXX
+    mov byte [r12 + H5aParser.tokenizer.state], cl
+
+    mov rdi, r10
+    call _h5aTokenizerEmitCharacter
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
     xor al,al
     ret
 
   [[ASCII upper alpha]]
     ; ...
+    mov rdi, r10
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
   [[ASCII lower alpha]]
     ; ...
+    mov rdi, r10
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -803,23 +902,35 @@ end state
 state scriptDataDoubleEscaped,SCRIPT_DATA_DOUBLE_ESCAPED_STATE
 
   [[U+002D HYPHEN-MINUS]]
-    ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_DASH_STATE
+    xor edi,edi
+    mov dil, '-'
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
   [[U+003C LESS-THAN SIGN]]
-    ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_LESS_THAN_SIGN_STATE
+    xor edi,edi
+    mov dil, '<'
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
   [[U+0000 NULL]]
     ; ...
+    xor edi,edi
+    mov di, 0xFFFD
+    call _h5aTokenizerEmitCharacter
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -829,20 +940,27 @@ end state
 state scriptDataDoubleEscapedDash,SCRIPT_DATA_DOUBLE_ESCAPED_DASH_STATE
 
   [[U+002D HYPHEN-MINUS]]
-    ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_DASH_DASH_STATE
+    xor edi,edi
+    mov dil, '-'
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
   [[U+003C LESS-THAN SIGN]]
-    ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_LESS_THAN_SIGN_STATE
+    xor edi,edi
+    mov dil, '<'
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
   [[U+0000 NULL]]
     ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    xor edi,edi
+    mov di, 0xFFFD
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -851,8 +969,8 @@ state scriptDataDoubleEscapedDash,SCRIPT_DATA_DOUBLE_ESCAPED_DASH_STATE
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -862,25 +980,34 @@ end state
 state scriptDataDoubleEscapedDashDash,SCRIPT_DATA_DOUBLE_ESCAPED_DASH_DASH_STATE
 
   [[U+002D HYPHEN-MINUS]]
-    ; ...
+    xor edi,edi
+    mov dil, '-'
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
   [[U+003C LESS-THAN SIGN]]
-    ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_LESS_THAN_SIGN_STATE
+    xor edi,edi
+    mov dil, '<'
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
+    xor edi,edi
+    mov dil, '>'
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
   [[U+0000 NULL]]
     ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    xor edi,edi
+    mov di, 0xFFFD
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -889,8 +1016,8 @@ state scriptDataDoubleEscapedDashDash,SCRIPT_DATA_DOUBLE_ESCAPED_DASH_DASH_STATE
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -902,6 +1029,9 @@ state scriptDataDoubleEscapedLessThanSign,SCRIPT_DATA_DOUBLE_ESCAPED_LESS_THAN_S
   [[U+002F SOLIDUS]]
     ; ...
     mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPE_END_STATE
+    xor edi,edi
+    mov dil, '/'
+    call _h5aTokenizerEmitCharacter
     xor al,al
     ret
 
@@ -912,7 +1042,47 @@ state scriptDataDoubleEscapedLessThanSign,SCRIPT_DATA_DOUBLE_ESCAPED_LESS_THAN_S
 
 end state
 
-;; ...
+
+state scriptDataDoubleEscapeEnd,SCRIPT_DATA_DOUBLE_ESCAPE_END_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+  [[U+002F SOLIDUS]]
+  [[U+003E GREATER-THAN SIGN]]
+    xor al,al; ...
+    mov dx, SCRIPT_DATA_ESCAPED_STATE
+    mov cx, SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    test al,al
+    cmovz cx, dx
+    mov byte [r12 + H5aParser.tokenizer.state], cl
+    mov rdi, r10
+    call _h5aTokenizerEmitCharacter
+    xor al,al
+    ret
+
+  [[ASCII upper alpha]]
+    ; ...
+    mov rdi, r10
+    call _h5aTokenizerEmitCharacter
+    xor al,al
+    ret
+
+  [[ASCII lower alpha]]
+    ; ...
+    mov rdi, r10
+    call _h5aTokenizerEmitCharacter
+    xor al,al
+    ret
+
+  [[Anything else]]
+    mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_DOUBLE_ESCAPED_STATE
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
 
 state beforeAttributeName,BEFORE_ATTRIBUTE_NAME_STATE
 
@@ -1851,11 +2021,51 @@ state numericCharacterReferenceEnd,NUMERIC_CHARACTER_REFERENCE_END_STATE
   @NoConsume
 
 numeric_resolve:
+.start:
+  push r14 ;fix arity
+  mov r14, qword [r12 + H5aParser.tokenizer.char_ref]
 
+  test r14,r14
+  jnz .notNull
   ; ...
+  mov r14w, 0xFFFD
+  jmp .finish
+
+.notNull:
+  cmp r14, 0x10FFFF
+  jle .notOutOfRange
+  ; ...
+  xor r14,r14
+  mov r14w, 0xFFFD
+  jmp .finish
+
+.notOutOfRange:
+  call unicodeIsSurrogate
+  test al,al
+  jz .notSurrogate
+  ; ...
+  ;surrogates are u16
+  mov r14w, 0xFFFD
+  jmp .finish
+
+.notSurrogate:
+  call unicodeIsNonCharacter
+  test al,al
+  jz .notNonCharacter
+  ; ...
+  xor r14,r14
+  mov r14w, 0xFFFD
+  jmp .finish
+
+.notNonCharacter:
+  ; ... iter table
+
+.finish:
+  ; ...
+  ; ... flush
   mov cl, byte [r12 + H5aParser.tokenizer.return_state]
   mov byte [r12 + H5aParser.tokenizer.state], cl
-  xor al,al
+  pop r14
   ret
 
 end state

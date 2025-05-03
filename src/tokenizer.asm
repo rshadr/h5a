@@ -51,7 +51,7 @@ _h5aTokenizerEatFilterCase:
   cmp edi, 'Z'
   jnc .finish
 
-  xor edi, ('A' xor 'a')
+  xor dil, ('A' xor 'a')
 
 .finish:
   ret
@@ -164,6 +164,24 @@ _h5aTokenizerEatInsensitive:
 _h5aTokenizerEatSensitive:
   lea rdx, [_h5aTokenizerEatFilterNone]
   jmp _h5aTokenizerEatGeneric
+
+_h5aTokenizerCreateDoctype:
+  ; ...
+  ret
+
+_h5aTokenizerCreateTag:
+  ; ...
+  ret
+
+_h5aTokenizerCreateStartTag:
+  xor rdi,rdi
+  mov dil, TOKEN_START_TAG
+  jmp _h5aTokenizerCreateTag
+
+_h5aTokenizerCreateEndTag:
+  xor rdi,rdi
+  mov dil, TOKEN_END_TAG
+  jmp _h5aTokenizerCreateTag
 
 _h5aTokenizerEmitToken:
   ;; R12 (s): H5aParser *parser
@@ -386,8 +404,8 @@ _h5aTokenizerMain:
 
 .charLoop.spcAction:
       movzx rax, byte [r12 + H5aParser.tokenizer.state]
-      lea rcx, [_k_h5a_Tokenizer_spc_action_table]
-      mov rcx, [rcx + rax * 8]
+      lea rdx, [_k_h5a_Tokenizer_spc_action_table]
+      mov rcx, qword [rdx + rax * 8]
       ;;push rbx
       call rcx
       ;;pop rbx
