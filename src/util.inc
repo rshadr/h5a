@@ -105,6 +105,29 @@ macro with_saved_regs? regs&
 end macro
 
 
+macro with_stack_frame?
+  push rbp
+  mov rbp, rsp
+
+  calminstruction ? line&
+    local var
+
+    match =end? =with_stack_frame?, line
+    jyes finish
+
+  unknown:
+    assemble line
+    exit
+
+  finish:
+    asm leave
+    arrange var, =purge ?
+    assemble var
+    exit
+  end calminstruction
+end macro
+
+
 calminstruction zero_init? ptr*,size*
   local var
 

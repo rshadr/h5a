@@ -12,6 +12,7 @@ CFLAGS += -I./include
 SOURCES =\
 	character_queue\
 	entities\
+	insertion_modes\
 	parser\
 	tokenizer\
 	tokenizer_states\
@@ -22,6 +23,8 @@ OBJS = $(patsubst %, build/%.o, $(SOURCES))
 
 build/character_queue.o: src/character_queue.asm \
 	src/local.inc src/util.inc
+build/insertion_modes.o: src/insertion_modes.asm \
+	src/insertion_modes.g src/local.inc src/util.inc
 build/parser.o: src/parser.asm \
 	src/local.inc src/util.inc
 build/tokenizer.o: src/tokenizer.asm \

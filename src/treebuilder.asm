@@ -12,10 +12,7 @@ section '.text' executable
 
 _h5aTreeBuilderAcceptToken:
   ;; -> void
-  push rbp
-  mov rbp, rsp
-
-  
-
-  leave
+  with_stack_frame
+    ; ...
+  end with_stack_frame
   ret

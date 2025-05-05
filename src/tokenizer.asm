@@ -7,7 +7,6 @@ include 'macro/struct.inc'
 include "util.inc"
 include "local.inc"
 
-
 format ELF64
 
 extrn _k_h5a_Tokenizer_flags_table
@@ -183,6 +182,7 @@ _h5aTokenizerCreateEndTag:
   mov dil, TOKEN_END_TAG
   jmp _h5aTokenizerCreateTag
 
+public _h5aTokenizerEmitToken
 _h5aTokenizerEmitToken:
   ;; R12 (s): H5aParser *parser
   ;; RDI (a): union Token token
@@ -200,22 +200,25 @@ _h5aTokenizerEmitCharacter:
 ;; R12 (s): H5aParser *parser
 ;; RDI (EDI): char32_t c
 ;; -> void
-  xor esi,esi
-  xor eax,eax
+  xor rsi,rsi
   mov sil, TOKEN_CHARACTER
-  mov al, TOKEN_WHITESPACE
 
-  push rdi
-  vpbroadcastd xmm1, dword [rsp + 8]
-  pop rdi
-  movdqa xmm2, xmm1
-  movapd xmm1, [_k_h5a_whitespaceSet] ;oword
-  pcmpeqd xmm1, xmm2
-  ptest xmm1,xmm1
+  cmp esi, 0x09
+  je .yes
+  cmp esi, 0x0A
+  je .yes
+  cmp esi, 0x0C
+  je .yes
+  cmp esi, 0x20
+  je .yes
 
-  cmove si, ax
-
+.no:
   jmp _h5aTokenizerEmitToken
+
+.yes:
+  mov sil, TOKEN_WHITESPACE
+  jmp _h5aTokenizerEmitToken
+
 
 _h5aTokenizerEmitEof:
   ;; R12 (s): H5aParser *parser
@@ -257,7 +260,7 @@ with_saved_regs r8, rbx
     test eax,eax
     jz .finish
 
-    
+    ; ...
 
     jmp .loop
 
@@ -486,10 +489,3 @@ _h5aTokenizerMain:
     xor rax,rax
     ret
 
-
-section '.rodata'
-
-align 8
-dq 0xCAFECAFECAFECAFE
-_k_h5a_whitespaceSet:
-dd 0x0009, 0x000A, 0x000C, 0x000D

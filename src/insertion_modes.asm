@@ -1,19 +1,31 @@
+;;;;
+;;;; Copyright 2025 rshadr
+;;;; See LICENSE for details
+;;;;
+
+include 'macro/struct.inc'
+include "util.inc"
+include "local.inc"
+include "insertion_modes.g"
+
 
 format ELF64
 
-insertion_mode initial,INITIAL_MODE
+section '.text'
+
+mode initial,INITIAL_MODE
 
   [[Whitespace]]
     mov al, RESULT_IGNORE
     ret
 
   [[Comment]]
-    ; ... insert comment
+    ; ...
     xor al,al
     ret
 
   [[DOCTYPE]]
-    ; ... zzz
+    ; ...
     mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HTML_MODE
     xor al,al
     ret
@@ -24,71 +36,91 @@ insertion_mode initial,INITIAL_MODE
     mov al, RESULT_REPROCESS
     ret
 
-end insertion_mode
+end mode
 
 
-insertion_mode inHead,IN_HEAD_MODE
-  [[Start tag "title"]]
-    jmp generic_rcdata_parse
-end insertion_mode
+mode beforeHtml,BEFORE_HTML_MODE
 
-
-insertion_mode inBody,IN_BODY_MODE
-  [[Whitespace]]
-    call reconstruct_formatting
-    call insert_character
-    xor al,al
-    ret
-
-  [[Character]]
-    cmp edi, 0x0000
-    jne CASE_BLOCK.default
-    ; error
+  [[DOCTYPE]]
+    ; ...
     mov al, RESULT_IGNORE
-    ret
-CASE_BLOCK.default:
-    xor al,al
     ret
 
   [[Comment]]
-    call insert_comment
+    ; ...
     xor al,al
     ret
 
-  [[DOCTYPE]]
-    ; error
+  [[Whitespace]]
     mov al, RESULT_IGNORE
     ret
 
   [[Start tag "html"]]
-    ;error
-    ;...
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HEAD_MODE
+    end with_stack_frame
+    xor al,al
     ret
 
-  [[Start tag "base"]]
-  ;; label H5aTreeBuilderHandle.inBody.startTag.base
-  ;; ;; record at index key like for the Tokenizer
-  [[Start tag "basefont"]]
-  [[Start tag "bgsound"]]
-  [[Start tag "link"]]
-  [[Start tag "meta"]]
-  [[Start tag "noframes"]]
-  [[Start tag "script"]]
-  [[Start tag "style"]]
-  [[Start tag "template"]]
-  [[Start tag "title"]]
-  [[End tag "template"]]
-    process_as IN_HEAD
-  ;; calminstruction process_as? idx_name*
-  ;;   local var, val, idx
-  ;;   compute idx, idx_name
-  ;;
-  ;;   arrange var, =mov $DISPATCH_MODE_KEY, idx
-  ;;   ;; "hot inject" another mode key for the dispatcher. No need to care
-  ;;   ;; about stack or local variables!!
-  ;;   arrange var, =jmp H5aTreeBuilderAcceptToken.preDispatch
-  ;;   assemble var
-  ;; end calminstruction
+  [[End tag "head"]]
+  [[End tag "body"]]
+  [[End tag "html"]]
+  [[End tag "br"]]
+    goto! anything_else
 
-end insertion_mode
+  [[Any other end tag]]
+    ; ...
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HEAD_MODE
+    mov al, RESULT_REPROCESS
+    ret
+
+end mode
+
+
+mode beforeHead,BEFORE_HEAD_MODE
+
+  [[Whitespace]]
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Comment]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag "html"]]
+    process_using_rules! IN_BODY
+
+  [[Start tag "head"]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_HEAD_MODE
+    xor al,al
+    ret
+
+  [[End tag "head"]]
+  [[End tag "body"]]
+  [[End tag "html"]]
+  [[End tag "br"]]
+    goto! anything_else
+
+  [[Any other end tag]]
+    ; ...
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Anything else]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_HEAD_MODE
+    mov al, RESULT_REPROCESS
+    ret
+
+end mode
 

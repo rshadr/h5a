@@ -15,6 +15,7 @@ public unicodeIsNonCharacter
 section 'text' executable
 
 unicodeIsLeadingSurrogate:
+  xor rax,rax
   mov edx, edi
   cmp edi, 0xD800
   setge cl
@@ -24,6 +25,7 @@ unicodeIsLeadingSurrogate:
   ret
 
 unicodeIsTrailingSurrogate:
+  xor rax,rax
   mov edx, edi
   cmp edi, 0xDC00
   setge cl

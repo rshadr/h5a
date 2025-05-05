@@ -17,6 +17,7 @@ extrn _h5aTokenizerEatInsensitive
 extrn _h5aTokenizerEmitCharacter
 extrn _h5aTokenizerEmitEof
 extrn _h5aTokenizerHaveAppropriateEndTag
+extrn _h5aTokenizerFlushEntityChars
 extrn _CharacterQueuePushFront
 extrn unicodeIsSurrogate
 extrn unicodeIsNonCharacter
@@ -54,10 +55,12 @@ state data,DATA_STATE
     ret
 
   [[U+0000 NULL]]
-    ; XXX: error
-    mov rdi, r10
-    call _h5aTokenizerEmitCharacter
-    xor al,al
+    with_stack_frame
+      ; XXX: error
+      mov rdi, r10
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_stack_frame
     ret
 
   [[EOF]]
@@ -65,8 +68,10 @@ state data,DATA_STATE
     ret
 
   [[Anything else]]
-    call _h5aTokenizerEmitCharacter
-    xor al,al
+    with_stack_frame
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_stack_frame
     ret
 
 end state
@@ -94,9 +99,11 @@ state rcdata,RCDATA_STATE
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
-    call _h5aTokenizerEmitCharacter
-    xor al,al
+    with_stack_frame
+      ; ...
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_stack_frame
     ret
 
 end state
@@ -111,18 +118,22 @@ state rawtext,RAWTEXT_STATE
 
   [[U+0000 NULL]]
     ; ...
-    xor edi,edi
-    mov di, 0xFFFD
-    call _h5aTokenizerEmitCharacter
-    xor al,al
+    with_stack_frame
+      xor edi,edi
+      mov di, 0xFFFD
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_stack_frame
     ret
 
   [[EOF]]
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    call _h5aTokenizerEmitCharacter
-    xor al,al
+    with_stack_frame
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_stack_frame
     ret
 
 end state
@@ -137,18 +148,22 @@ state scriptData,SCRIPT_DATA_STATE
 
   [[U+0000 NULL]]
     ; ...
-    xor edi,edi
-    mov di, 0xFFFD
-    call _h5aTokenizerEmitCharacter
-    xor al,al
+    with_stack_frame
+      xor edi,edi
+      mov di, 0xFFFD
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_stack_frame
     ret
 
   [[EOF]]
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    call _h5aTokenizerEmitCharacter
-    xor al,al
+    with_stack_frame
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_stack_frame
     ret
 
 end state
@@ -157,19 +172,23 @@ end state
 state plaintext,PLAINTEXT_STATE
 
   [[U+0000 NULL]]
-    ; ...
-    xor edi,edi
-    mov di, 0xFFFD
-    call _h5aTokenizerEmitCharacter
-    xor al,al
+    with_stack_frame
+      ; ...
+      xor edi,edi
+      mov di, 0xFFFD
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_stack_frame
     ret
 
   [[EOF]]
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    call _h5aTokenizerEmitCharacter
-    xor al,al
+    with_stack_frame
+      call _h5aTokenizerEmitCharacter
+      xor al,al
+    end with_stack_frame
     ret
 
 end state
@@ -200,19 +219,23 @@ state tagOpen,TAG_OPEN_STATE
     ret
 
   [[EOF]]
-    ; ...
-    xor edi,edi
-    mov dil, '<'
-    call _h5aTokenizerEmitCharacter
+    with_stack_frame
+      ; ...
+      xor edi,edi
+      mov dil, '<'
+      call _h5aTokenizerEmitCharacter
+    end with_stack_frame
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
-    xor edi,edi
-    mov dil, '<'
-    call _h5aTokenizerEmitCharacter
-    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
-    mov al, RESULT_RECONSUME
+    with_stack_frame
+      ; ...
+      xor edi,edi
+      mov dil, '<'
+      call _h5aTokenizerEmitCharacter
+      mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+      mov al, RESULT_RECONSUME
+    end with_stack_frame
     ret
 
 end state
@@ -233,13 +256,15 @@ state endTagOpen,END_TAG_OPEN_STATE
     ret
 
   [[EOF]]
-    ; ...
-    xor edi,edi
-    mov dil, '<'
-    call _h5aTokenizerEmitCharacter
-    xor edi,edi
-    mov dil, '/'
-    call _h5aTokenizerEmitCharacter
+    with_stack_frame
+      ; ...
+      xor edi,edi
+      mov dil, '<'
+      call _h5aTokenizerEmitCharacter
+      xor edi,edi
+      mov dil, '/'
+      call _h5aTokenizerEmitCharacter
+    end with_stack_frame
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
@@ -334,8 +359,10 @@ state rcdataEndTagName,RCDATA_END_TAG_NAME_STATE
   [[U+000A LINE FEED]]
   [[U+000C FORM FEED]]
   [[U+0020 SPACE]]
-    call _h5aTokenizerHaveAppropriateEndTag
-    test al,al
+    with_stack_frame
+      call _h5aTokenizerHaveAppropriateEndTag
+      test al,al
+    end with_stack_frame
 
     goto_if! z anything_else
 
@@ -344,8 +371,10 @@ state rcdataEndTagName,RCDATA_END_TAG_NAME_STATE
     ret
 
   [[U+002F SOLIDUS]]
-    call _h5aTokenizerHaveAppropriateEndTag
-    test al,al
+    with_stack_frame
+      call _h5aTokenizerHaveAppropriateEndTag
+      test al,al
+    end with_stack_frame
 
     goto_if! z anything_else
 
@@ -354,8 +383,10 @@ state rcdataEndTagName,RCDATA_END_TAG_NAME_STATE
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    call _h5aTokenizerHaveAppropriateEndTag
-    test al,al
+    with_stack_frame
+      call _h5aTokenizerHaveAppropriateEndTag
+      test al,al
+    end with_stack_frame
 
     goto_if! z anything_else
 
@@ -391,11 +422,13 @@ state rawtextLessThanSign,RAWTEXT_LESS_THAN_SIGN_STATE
     ret
 
   [[Anything else]]
-    xor edi,edi
-    mov dil, '<'
-    call _h5aTokenizerEmitCharacter
-    mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_STATE
-    mov al, RESULT_RECONSUME
+    with_stack_frame
+      xor edi,edi
+      mov dil, '<'
+      call _h5aTokenizerEmitCharacter
+      mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_STATE
+      mov al, RESULT_RECONSUME
+    end with_stack_frame
     ret
 
 end state
@@ -410,14 +443,16 @@ state rawtextEndTagOpen,RAWTEXT_END_TAG_OPEN_STATE
     ret
 
   [[Anything else]]
-    xor edi,edi
-    mov dil, '<'
-    call _h5aTokenizerEmitCharacter
-    xor edi,edi
-    mov dil, '/'
-    call _h5aTokenizerEmitCharacter
-    mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_STATE
-    mov al, RESULT_RECONSUME
+    with_stack_frame
+      xor edi,edi
+      mov dil, '<'
+      call _h5aTokenizerEmitCharacter
+      xor edi,edi
+      mov dil, '/'
+      call _h5aTokenizerEmitCharacter
+      mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_STATE
+      mov al, RESULT_RECONSUME
+    end with_stack_frame
     ret
 
 end state
@@ -429,8 +464,10 @@ state rawtextEndTagName,RAWTEXT_END_TAG_NAME_STATE
   [[U+000A LINE FEED]]
   [[U+000C FORM FEED]]
   [[U+0020 SPACE]]
-    call _h5aTokenizerHaveAppropriateEndTag
-    test al,al
+    with_stack_frame
+      call _h5aTokenizerHaveAppropriateEndTag
+      test al,al
+    end with_stack_frame
 
     goto_if! z anything_else
 
@@ -439,8 +476,10 @@ state rawtextEndTagName,RAWTEXT_END_TAG_NAME_STATE
     ret
 
   [[U+002F SOLIDUS]]
-    call _h5aTokenizerHaveAppropriateEndTag
-    test al,al
+    with_stack_frame
+      call _h5aTokenizerHaveAppropriateEndTag
+      test al,al
+    end with_stack_frame
 
     goto_if! z anything_else
 
@@ -449,8 +488,10 @@ state rawtextEndTagName,RAWTEXT_END_TAG_NAME_STATE
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    call _h5aTokenizerHaveAppropriateEndTag
-    test al,al
+    with_stack_frame
+      call _h5aTokenizerHaveAppropriateEndTag
+      test al,al
+    end with_stack_frame
 
     goto_if! z anything_else
 
@@ -2019,6 +2060,9 @@ end state
 state numericCharacterReferenceEnd,NUMERIC_CHARACTER_REFERENCE_END_STATE
 
   @NoConsume
+  @SpecialAction
+
+public numeric_resolve
 
 numeric_resolve:
 .start:
@@ -2058,11 +2102,14 @@ numeric_resolve:
   jmp .finish
 
 .notNonCharacter:
+  ; ...
+.notControlCharacter:
   ; ... iter table
 
 .finish:
-  ; ...
-  ; ... flush
+  ; XXX: clear tmpbuf
+  ; XXX: append r14 to tmpbuf
+  call _h5aTokenizerFlushEntityChars
   mov cl, byte [r12 + H5aParser.tokenizer.return_state]
   mov byte [r12 + H5aParser.tokenizer.state], cl
   pop r14
