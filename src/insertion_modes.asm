@@ -124,3 +124,33 @@ mode beforeHead,BEFORE_HEAD_MODE
 
 end mode
 
+
+; ...
+
+
+mode inTableText,IN_TABLE_TEXT_MODE
+
+  [[Character]]
+    ; XXX: check null
+    ; ...
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Any other character]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Anything else]]
+    with_stack_frame
+      ; ...
+      mov cl, byte [r12 + H5aParser.treebuilder.original_mode]
+      mov byte [r12 + H5aParser.treebuilder.mode], cl
+    end with_stack_frame
+    mov al, RESULT_REPROCESS
+    ret
+end mode
+
+
+; ...
+

@@ -20,11 +20,19 @@ macro mode? name*,index_name*
   local action_index
   local action_pending
   local action_next_label
-  local start_tag_qualname_next_label
-  local end_tag_qualname_next_label
+  local stag_next_label
+  local etag_next_label
+  local stag_index
+  local etag_index
+  local stag_have_catchall
+  local etag_have_catchall
   type_index = 0
   action_index = 0
   action_pending = 0
+  stag_index = 0
+  etag_index = 0
+  stag_have_catchall = 0
+  etag_have_catchall = 0
 
   calminstruction setup
     local var
@@ -33,14 +41,18 @@ macro mode? name*,index_name*
     arrange var, =public prefix
     assemble var
 
-    arrange type_next_label, prefix.=type.0
-    arrange action_next_label, prefix.=action.0
+    arrange type_next_label, prefix.=typeCheck.type_index
+    arrange action_next_label, prefix.=action.action_index
+    arrange stag_next_label, prefix.=startTagCheck.stag_index
+    arrange etag_next_label, prefix.=endTagCheck.etag_index
 
     exit
   end calminstruction
 
+
   setup
-  purge setup
+  nop
+
 
   calminstruction stride_type_head t*
     local var
@@ -50,18 +62,55 @@ macro mode? name*,index_name*
     arrange var, =label type_next_label
     assemble var
 
+    asm nop ;dbg
+
     compute type_index, type_index + 1
-    arrange type_next_label, prefix.=type.type_index
+    arrange type_next_label, prefix.=typeCheck.type_index
 
     arrange var, =cmp =sil, t
     assemble var
+
+    ;; XXX optimization: simpler jump when no other type is allowed
+    ; arrange var, =jne type_next_label
     arrange var, =je action_next_label
     assemble var
     arrange var, =jmp type_next_label
     assemble var
 
-    compute action_pending, action_pending + 1
+    compute action_pending, 1
     
+  end calminstruction
+
+
+  calminstruction stride_start_tag qname_idx*
+    local var
+
+    arrange var, =public stag_next_label
+    assemble var
+    arrange var, =label stag_next_label
+    assemble var
+
+    asm nop ;dbg
+
+    compute stag_index, stag_index + 1
+    arrange stag_next_label, prefix.=startTagCheck.stag_index
+
+    ; XXX: check tag struct
+    arrange var, =cmp =eax, qname_idx
+    assemble var
+    ;; XXX optimization: simpler jump when no other type is allowed
+    ; arrange var, =jne stag_next_label
+    arrange var, =je action_next_label
+    assemble var
+    arrange var, =jmp stag_next_label
+    assemble var
+
+    compute action_pending, 1
+
+  end calminstruction
+
+
+  calminstruction stride_end_tag qname_idx*
   end calminstruction
 
 
@@ -78,6 +127,8 @@ macro mode? name*,index_name*
     jyes whitespace
     match =[=[=Character=]=], line
     jyes character
+    match =[=[=Any =other =character=]=], line
+    jyes any_other_character
     match =[=[=Comment=]=], line
     jyes comment
     match =[=[=DOCTYPE=]=], line
@@ -117,6 +168,7 @@ macro mode? name*,index_name*
     jyes process_using_rules
 
   unknown:
+    ;; Default assembly
     assemble line
     exit
 
@@ -134,27 +186,68 @@ macro mode? name*,index_name*
 
   character:
     ; ...
+    check type_character_seen
+    jyes ch_already
+    arrange val, =TOKEN_CHARACTER
+    call stride_type_head, val
+    arrange type_character_seen, 1
+    exit
+  ch_already:
+    err "duplicate character clause"
+    exit
+
+  any_other_character:
+    ; XXX: check conditions
+    ; ...
     exit
 
   comment:
     ; ...
+    check type_comment_seen
+    jyes comm_already
+    arrange val, =TOKEN_COMMENT
+    call stride_type_head, val
+    arrange type_comment_seen, 1
+    exit
+  comm_already:
+    err "duplicate comment clause"
     exit
 
   doctype:
     ; ...
+    check type_doctype_seen
+    jyes dt_already
+    arrange val, =TOKEN_DOCTYPE
+    call stride_type_head, val
+    arrange type_doctype_seen, 1
+    exit
+  dt_already:
+    err "duplicate DOCTYPE clause"
     exit
 
   start_tag:
     ; ...
     check type_start_tag_seen
-    jyes stag_fine
+    jyes stag_seen_typecheck
     arrange val, =TOKEN_START_TAG
     call stride_type_head, val
     arrange type_start_tag_seen, 1
-  stag_fine:
+  stag_seen_typecheck:
+    ; XXX: use virtual array to check if case already defined
+    call stride_start_tag, qualname
+    ; ...
     exit
 
   end_tag:
+    ; ...
+    check type_end_tag_seen
+    jyes etag_seen_typecheck
+    arrange val, =TOKEN_END_TAG
+    call stride_type_head, val
+    arrange type_end_tag_seen, 1
+  etag_seen_typecheck:
+    ; XXX: use virtual array to check if case already defined
+    call stride_end_tag, qualname
     ; ...
     exit
 
@@ -174,6 +267,23 @@ macro mode? name*,index_name*
     assemble var
     arrange var, =label type_next_label
     assemble var
+
+    check stag_have_catchall
+    jyes any_no_stag_needed
+
+    arrange var, =public stag_next_label
+    assemble var
+    arrange var, =label stag_next_label
+    assemble var
+    take stag_next_label, val ;unused
+
+  any_no_stag_needed:
+    check defined etag_next_label
+    jno any_no_etag_needed
+
+    ; ...
+
+  any_no_etag_needed:
     exit
 
   goto_always:
