@@ -7,10 +7,68 @@ calminstruction (var) constequ? val
 
 end calminstruction
 
-calminstruction likely? opc,rest&
-  local var
 
-  ; XXX: check if valid jump opcode
+calminstruction unimplemented?
+  asm ud2
+end calminstruction
+
+
+if 0
+  calminstruction validate_jxx? opc*
+    match =jae?, opc
+    jyes good
+    ; ...
+    match =je?, opc
+    jyes good
+    match =jg?, opc
+    jyes good
+    match =jge?, opc
+    jyes good
+    match =jl?, opc
+    jyes good
+    match =jle?, opc
+    jyes good
+    ; ...
+    match =jne?, opc
+    jyes good
+    match =jng?, opc
+    jyes good
+    ; ...
+    match =jnz?, opc
+    jyes good
+    ; ...
+    match =jz?, opc
+    jyes good
+    ; ...
+
+  bad:
+    err "invalid conditional jump name"
+    exit
+  good:
+    exit
+  end calminstruction
+
+
+  calminstruction likely? line&
+    local opc, target
+    match opc target, line
+    jno fail
+
+    call validate_jxx, opc
+
+    asm db 0x3E
+    arrange var, opc target
+    assemble var
+
+  fail:
+    err "'likely' requires a conditional jump instruction as line argument"
+    exit
+  end calminstruction
+
+end if
+
+calminstruction likely? opc*,rest&
+  local var
 
   asm db 0x3E
   arrange var, opc rest
@@ -19,14 +77,13 @@ calminstruction likely? opc,rest&
 end calminstruction
 
 
-calminstruction unlikely? opc,rest&
+calminstruction unlikely? opc*,rest&
   local var
-
-  ; XXX: check if valid jump opcode
 
   asm db 0x2E
   arrange var, opc rest
   assemble var
+
 end calminstruction
 
 
@@ -125,6 +182,7 @@ macro with_stack_frame?
     assemble var
     exit
   end calminstruction
+
 end macro
 
 

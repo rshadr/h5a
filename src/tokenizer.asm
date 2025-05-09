@@ -9,13 +9,15 @@ include "local.inc"
 
 format ELF64
 
-extrn _k_h5a_Tokenizer_flags_table
-extrn _k_h5a_Tokenizer_spc_action_table
-extrn _k_h5a_Tokenizer_common_dispatch_table
 
 extrn _CharacterQueuePushBack
 extrn _CharacterQueuePopFront
 extrn _CharacterQueueSubscript
+extrn _h5aTreeBuilderAcceptToken
+
+extrn _k_h5a_Tokenizer_flags_table
+extrn _k_h5a_Tokenizer_spc_action_table
+extrn _k_h5a_Tokenizer_common_dispatch_table
 
 public _h5aTokenizerError
 public _h5aTokenizerEat
@@ -184,16 +186,13 @@ _h5aTokenizerCreateEndTag:
 
 public _h5aTokenizerEmitToken
 _h5aTokenizerEmitToken:
-  ;; R12 (s): H5aParser *parser
-  ;; RDI (a): union Token token
-  ;; RSI (a): e8 type
-  push rbp
-  mov rbp, rsp
-
-  ;; ...
-  xor al,al
-
-  leave
+;; R12 (s): H5aParser *parser
+;; RDI (a): union Token token
+;; RSI (a): e8 type
+;; -> void
+  with_stack_frame
+    call _h5aTreeBuilderAcceptToken
+  end with_stack_frame
   ret
 
 _h5aTokenizerEmitCharacter:

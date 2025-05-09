@@ -11,7 +11,19 @@ include "insertion_modes.g"
 
 format ELF64
 
+public _k_h5a_TreeBuilder_handlerTable
+
 section '.text'
+
+_h5aTreeBuilderHandler.DUMMY:
+  cmp dil, TOKEN_EOF
+  je _h5aTreeBuilderHandler.DUMMY.eof
+  xor al,al
+  ret
+_h5aTreeBuilderHandler.DUMMY.eof:
+  mov al, RESULT_EOF_REACHED
+  ret
+
 
 mode initial,INITIAL_MODE
 
@@ -97,7 +109,7 @@ mode beforeHead,BEFORE_HEAD_MODE
     ret
 
   [[Start tag "html"]]
-    process_using_rules! IN_BODY
+    process_using_rules! IN_BODY_MODE
 
   [[Start tag "head"]]
     ; ...
@@ -121,6 +133,33 @@ mode beforeHead,BEFORE_HEAD_MODE
     mov byte [r12 + H5aParser.treebuilder.mode], IN_HEAD_MODE
     mov al, RESULT_REPROCESS
     ret
+
+end mode
+
+
+; ...
+
+
+mode inBody,IN_BODY_MODE
+
+  ; ...
+
+  [[Any other start tag]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Any other end tag]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Anything else]]
+    unimplemented
 
 end mode
 
@@ -154,3 +193,64 @@ end mode
 
 ; ...
 
+
+mode inColumnGroup,IN_COLUMN_GROUP_MODE
+
+  [[Whitespace]]
+    ; XXX: insert character
+    xor al,al
+    ret
+
+  [[Comment]]
+    ; XXX: insert comment
+    xor al,al
+    ret
+
+  [[DOCTYPE]]
+    ; ...
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Start tag "html"]]
+    process_using_rules! IN_BODY_MODE
+
+  [[Start tag "col"]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[End tag "colgroup"]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[End tag "col"]]
+    ; ...
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Start tag "template"]]
+  [[End tag "template"]]
+    process_using_rules! IN_HEAD_MODE
+
+  [[EOF]]
+    process_using_rules! IN_BODY_MODE
+
+  [[Anything else]]
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_MODE
+    end with_stack_frame
+    mov al, RESULT_RECONSUME
+    ret
+
+end mode
+
+
+; ...
+section '.rodata'
+  generate_tables

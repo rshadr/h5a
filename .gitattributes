@@ -1,0 +1,3 @@
+*.asm linguist-language=Assembly
+*.inc linguist-language=Assembly
+*.g linguist-language=Assembly

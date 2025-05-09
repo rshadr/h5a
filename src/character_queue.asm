@@ -71,6 +71,7 @@ _CharacterQueueGrow:
   push rbp
   mov rbp, rsp
   ;; XXX ...
+  unimplemented
   leave
   ret
 
