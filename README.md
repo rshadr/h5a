@@ -12,7 +12,6 @@ for things I have wanted to try for a long time and also my first
 ## Requirements
 - fasm2
 - libc
-- AVX2
 
 ## Status
 - Tokenizer: partially implemented
@@ -21,3 +20,5 @@ Hence, **not usable yet!!!**
 
 ## Caveats
 - No debug symbols
+- make dependencies have to be manually specified because there's
+  no fasmg macro for that yet

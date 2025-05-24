@@ -180,6 +180,30 @@ struct H5aParserCreateInfo
   user_data  dq ?
 ends
 
+struct H5aSinkVTable
+  finish dq ?
+  parse_error dq ?
+  get_document dq ?
+  get_template_contents dq ?
+  set_quirks_mode dq ?
+  same_node dq ?
+  elem_name dq ?
+  create_element dq ?
+  create_comment dq ?
+  append dq ?
+  append_before_sibling dq ?
+  append_doctype_to_document dq ?
+  add_attrs_if_missing dq ?
+  remove_from_parent dq ?
+  reparent_children dq ?
+  mark_script_already_started dq ?
+  complete_script dq ?
+  is_mathml_annotation_xml_integration_point dq ?
+
+  get_tag_by_name dq ?
+  destroy_handle dq ?
+ends
+
 enum
   H5A_SUCCESS = 0
   H5A_FAILURE = 1

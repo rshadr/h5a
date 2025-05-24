@@ -1,9 +1,9 @@
-#
-# Copyright 2024 rshadr
-# See LICENSE for details
-#
+####
+#### Copyright 2024 rshadr
+#### See LICENSE for details
+####
 
-all: build/libh5a.a build_tests
+all: build/libh5a.a build_tests build_examples
 
 include config.mk
 
@@ -42,7 +42,16 @@ TEST_DEPS = $(patsubst %, %.d, $(TEST_BINS))
 
 -include $(TEST_DEPS)
 
+EXAMPLES =\
+	minidom
+
+EXAMPLE_BINS = $(patsubst %, build/examples/%, $(EXAMPLES))
+EXAMPLE_DEPS = $(patsubst %, %.d, $(EXAMPLE_BINS))
+
+-include $(EXAMPLE_DEPS)
+
 build_tests: $(TEST_BINS)
+build_examples: $(EXAMPLE_BINS)
 
 build/libh5a.a: $(OBJS)
 	@mkdir -p $(@D)
@@ -66,6 +75,10 @@ gen/entities.asm: ext/entities.json build/tools/gen_entities
 	build/tools/gen_entities ext/entities.json > $@
 
 build/test/%: test/%.c build/libh5a.a
+	@mkdir -p $(@D)
+	$(CC) -o $@ -MMD $(CFLAGS) $< -L./build -lh5a -lgrapheme
+
+build/examples/%: examples/%.c build/libh5a.a
 	@mkdir -p $(@D)
 	$(CC) -o $@ -MMD $(CFLAGS) $< -L./build -lh5a -lgrapheme
 

@@ -142,6 +142,26 @@ end mode
 
 mode inBody,IN_BODY_MODE
 
+  [[Character U+0000]]
+    with_stack_frame
+      ; ...
+      mov al, RESULT_IGNORE
+    end with_stack_frame
+    ret
+
+  [[Whitespace]]
+    with_stack_frame
+      ; XXX: reconstruct
+      ; XXX: insert character
+    end with_stack_frame
+    ret
+
+  [[Any other character]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    ret
+
   ; ...
 
   [[Any other start tag]]
@@ -169,7 +189,7 @@ end mode
 
 mode inTableText,IN_TABLE_TEXT_MODE
 
-  [[Character]]
+  [[Character U+0000]]
     ; XXX: check null
     ; ...
     mov al, RESULT_IGNORE
@@ -251,6 +271,156 @@ mode inColumnGroup,IN_COLUMN_GROUP_MODE
 end mode
 
 
+mode inTableBody,IN_TABLE_BODY_MODE
+
+  [[Start tag "tr"]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
+    xor al,al
+    ret
+
+  [[Start tag "th"]]
+  [[Start tag "td"]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
+    mov al, RESULT_REPROCESS
+    ret
+
+  [[End tag "tbody"]]
+  [[End tag "tfoot"]]
+  [[End tag "thead"]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_MODE
+    xor al,al
+    ret
+
+  [[Start tag "col"]]
+  [[Start tag "colgroup"]]
+  [[Start tag "tbody"]]
+  [[Start tag "tfoot"]]
+  [[Start tag "thead"]]
+  [[End tag "table"]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_MODE
+    mov al, RESULT_REPROCESS
+    ret
+
+  [[End tag "body"]]
+  [[End tag "caption"]]
+  [[End tag "colgroup"]]
+  [[End tag "html"]]
+  [[End tag "td"]]
+  [[End tag "th"]]
+  [[End tag "tr"]]
+    ; ...
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Anything else]]
+    process_using_rules! IN_TABLE_MODE
+
+end mode
+
+
+mode inRow,IN_ROW_MODE
+
+  [[Start tag "th"]]
+  [[Start tag "td"]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_CELL_MODE
+    xor al,al
+    ret
+
+  [[End tag "tr"]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_BODY_MODE
+    xor al,al
+    ret
+
+  [[Start tag "caption"]]
+  [[Start tag "col"]]
+  [[Start tag "colgroup"]]
+  [[Start tag "tbody"]]
+  [[Start tag "tfoot"]]
+  [[Start tag "thead"]]
+  [[Start tag "tr"]]
+  [[End tag "table"]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_BODY_MODE
+    mov al, RESULT_REPROCESS
+    ret
+
+  [[End tag "tbody"]]
+  [[End tag "tfoot"]]
+  [[End tag "thead"]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_BODY_MODE
+    mov al, RESULT_REPROCESS
+    ret
+
+  [[Anything else]]
+    process_using_rules! IN_TABLE_MODE
+
+end mode
+
+
+close_cell:
+  with_stack_frame
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
+  end with_stack_frame
+  ret
+
+mode inCell,IN_CELL_MODE
+
+  [[End tag "td"]]
+  [[End tag "th"]]
+    ; ...
+    mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
+    xor al,al
+    ret
+
+  [[Start tag "caption"]]
+  [[Start tag "col"]]
+  [[Start tag "colgroup"]]
+  [[Start tag "tbody"]]
+  [[Start tag "td"]]
+  [[Start tag "tfoot"]]
+  [[Start tag "th"]]
+  [[Start tag "thead"]]
+  [[Start tag "tr"]]
+    ; ...
+    mov al, RESULT_REPROCESS
+    ret
+
+  [[End tag "body"]]
+  [[End tag "caption"]]
+  [[End tag "col"]]
+  [[End tag "colgroup"]]
+  [[End tag "html"]]
+    ; ...
+    mov al, RESULT_IGNORE
+    ret
+
+  [[End tag "table"]]
+  [[End tag "tbody"]]
+  [[End tag "tfoot"]]
+  [[End tag "thead"]]
+  [[End tag "tr"]]
+    ; ...
+    mov al, RESULT_REPROCESS
+    ret
+
+  [[Anything else]]
+    process_using_rules! IN_BODY_MODE
+
+end mode
+
+
 ; ...
 section '.rodata'
   generate_tables
+
+public myLabel
+myLabel:
+  dq 0x90

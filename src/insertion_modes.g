@@ -1,3 +1,15 @@
+;;;;
+;;;; Copyright 2025 rshadr
+;;;; See LICENSE for details
+;;;;
+;;;; State machine macros for the tree builder
+;;;;
+;;;; IMPLEMENTATION NOTES:
+;;;; - 'Any other character' must be the last in any clause block.
+;;;;   Not a problem if standard-compliant.
+;;;; - According to measurements, the "jmp +00" idiom does not cause any
+;;;;   noticeable performance issues.
+;;;;
 
 macro mode? name*,index_name*
   local prefix
@@ -8,6 +20,7 @@ macro mode? name*,index_name*
   local type_start_tag_seen
   local type_end_tag_seen
   local type_eof_seen
+  local any_seen
   prefix equ _h5aTreeBuilderHandler.name
   type_whitespace_seen = 0
   type_doctype_seen = 0
@@ -16,6 +29,7 @@ macro mode? name*,index_name*
   type_start_tag_seen = 0
   type_end_tag_seen = 0
   type_eof_seen = 0
+  any_seen = 0
 
   local type_index
   local type_next_label
@@ -28,6 +42,8 @@ macro mode? name*,index_name*
   local etag_index
   local stag_have_default
   local etag_have_default
+  local ch_have_generic
+  local ch_have_explicit
   type_index = 0
   action_index = 0
   action_pending = 0
@@ -35,6 +51,8 @@ macro mode? name*,index_name*
   etag_index = 0
   stag_have_default = 0
   etag_have_default = 0
+  ch_have_generic = 0
+  ch_have_explicit = 0
 
   calminstruction setup
     local var, val
@@ -80,7 +98,7 @@ macro mode? name*,index_name*
     assemble var
 
     ;; XXX optimization: simpler jump when no other type is allowed
-    ; arrange var, =jne type_next_label
+    ;; XXX' : this is not satisfyingly feasible and also useless!
     arrange var, =je action_next_label
     assemble var
     arrange var, =jmp type_next_label
@@ -110,8 +128,6 @@ macro mode? name*,index_name*
     assemble var
     arrange var, =je action_next_label
     assemble var
-
-    ; XXX: only emit when next check is not a stag
     arrange var, =jmp stag_next_label
     assemble var
 
@@ -139,12 +155,29 @@ macro mode? name*,index_name*
     assemble var
     arrange var, =je action_next_label
     assemble var
-
-    ; XXX: only emit when next check is not a etag
     arrange var, =jmp etag_next_label
     assemble var
 
     compute action_pending, 1
+
+  end calminstruction
+
+
+  calminstruction resolve_tag_stride_tail
+    local var
+
+    ; XXX:
+    exit
+
+  need_stag_resolve:
+    arrange var, =jmp stag_next_label
+    assemble var
+    exit
+
+  need_etag_resolve:
+    arrange var, =jmp etag_next_label
+    assemble var
+    exit
 
   end calminstruction
 
@@ -157,11 +190,32 @@ macro mode? name*,index_name*
     match =end? =mode?, line
     jyes finish
 
+    ;; Pre-filter tag patterns for stride resolve
+    match =[=[=Start =tag qualname=]=], line
+    jno prefilter_not_stag
+
+    ; ...
+
+    jump pattern_match
+
+    prefilter_not_stag:
+    match =[=[=End =tag qualname=]=], line
+    jno prefilter_not_etag
+
+    ; ...
+
+    jump pattern_match
+
+
+    prefilter_not_etag:
     ;; Patterns
+    pattern_match:
     match =[=[=Whitespace=]=], line
     jyes whitespace
     match =[=[=Character=]=], line
-    jyes character
+    jyes character_generic
+    match =[=[=Character =U+0000=]=], line
+    jyes character_explicit_null
     match =[=[=Any =other =character=]=], line
     jyes any_other_character
     match =[=[=Comment=]=], line
@@ -210,7 +264,9 @@ macro mode? name*,index_name*
     exit
 
   whitespace:
-    ; ...
+    check any_seen
+    jyes any_must_be_last
+
     check type_whitespace_seen
     jyes ws_already
     arrange val, =TOKEN_WHITESPACE
@@ -221,25 +277,68 @@ macro mode? name*,index_name*
     err "duplicate whitespace clause"
     exit
 
-  character:
-    ; ...
+  character_generic:
+    check any_seen
+    jyes any_must_be_last
+    check ch_have_explicit
+    jyes ch_cannot_mix
+
+    arrange ch_have_generic, 1
+
     check type_character_seen
-    jyes ch_already
+    jyes ch_generic_already
     arrange val, =TOKEN_CHARACTER
     call stride_type, val
     arrange type_character_seen, 1
     exit
-  ch_already:
-    err "duplicate character clause"
+  ch_generic_already:
+    err "duplicate generic character clause"
     exit
 
+  character_explicit_null:
+    check any_seen
+    jyes any_must_be_last
+    check ch_have_generic
+    jyes ch_cannot_mix
+
+    ;check type_character_seen
+    ;jyes ch_explicit_already
+    arrange val, =TOKEN_CHARACTER
+    call stride_type, val
+    arrange type_character_seen, 1
+    arrange ch_have_explicit, 1
+
+    asm test edi,edi
+    arrange var, =jnz prefix.=anyOtherCharacter
+    assemble var
+    exit
+
+  ch_cannot_mix:
+    err "cannot mix explicit (U+0000 / default) and generic character clause"
+    exit
+    
+
   any_other_character:
-    ; XXX: check conditions
-    ; ...
+    check any_seen
+    jyes any_must_be_last
+    check ch_have_generic
+    jyes ch_cannot_mix
+    check ch_have_explicit
+    jno anych_missing_cases
+
+    arrange var, =public prefix.=anyOtherCharacter
+    assemble var
+    arrange var, =label prefix.=anyOtherCharacter
+    assemble var
+    exit
+  anych_missing_cases:
+    err "'Any other character' clause requires explicit cases beforehand"
     exit
 
   comment:
-    ; ...
+    check any_seen
+    jyes any_must_be_last
+
     check type_comment_seen
     jyes comm_already
     arrange val, =TOKEN_COMMENT
@@ -251,7 +350,9 @@ macro mode? name*,index_name*
     exit
 
   doctype:
-    ; ...
+    check any_seen
+    jyes any_must_be_last
+
     check type_doctype_seen
     jyes dt_already
     arrange val, =TOKEN_DOCTYPE
@@ -263,7 +364,9 @@ macro mode? name*,index_name*
     exit
 
   start_tag:
-    ; ...
+    check any_seen
+    jyes any_must_be_last
+
     check type_start_tag_seen
     jyes stag_seen_typecheck
     arrange val, =TOKEN_START_TAG
@@ -276,7 +379,9 @@ macro mode? name*,index_name*
     exit
 
   end_tag:
-    ; ...
+    check any_seen
+    jyes any_must_be_last
+
     check type_end_tag_seen
     jyes etag_seen_typecheck
     arrange val, =TOKEN_END_TAG
@@ -289,16 +394,41 @@ macro mode? name*,index_name*
     exit
 
   any_other_start_tag:
-    ; ...
-    ;arrange stag_have_default, 1
+    check any_seen
+    jyes any_must_be_last
+    check stag_have_default
+    jyes anystag_already_seen
+
+    arrange stag_have_default, 1
+    arrange var, =public stag_next_label
+    assemble var
+    arrange var, =label stag_next_label
+    assemble var
+    exit
+  anystag_already_seen:
+    err "duplicate 'Any other start tag' clause"
     exit
 
   any_other_end_tag:
-    ; ...
+    check any_seen
+    jyes any_must_be_last
+    check etag_have_default
+    jyes anyetag_already_seen
+
+    arrange etag_have_default, 1
+    arrange var, =public etag_next_label
+    assemble var
+    arrange var, =label etag_next_label
+    assemble var
+    exit
+  anyetag_already_seen:
+    err "duplicate 'Any other end tag' clause"
     exit
 
   eof:
-    ; ...
+    check any_seen
+    jyes any_must_be_last
+
     check type_eof_seen
     jyes eof_already_seen
 
@@ -311,9 +441,10 @@ macro mode? name*,index_name*
     exit
 
   any:
-    ; XXX: error if anything new follows
-    ;any_seen = 1
-    ; ...
+    check any_seen
+    jyes any_already_seen
+
+    arrange any_seen, 1
     arrange var, =public type_next_label
     assemble var
     arrange var, =label type_next_label
@@ -330,8 +461,8 @@ macro mode? name*,index_name*
     asm nop
 
   any_no_stag_needed:
-    check defined etag_have_default
-    jno any_no_etag_needed
+    check etag_have_default
+    jyes any_no_etag_needed
 
     arrange var, =public etag_next_label
     assemble var
@@ -342,6 +473,15 @@ macro mode? name*,index_name*
 
   any_no_etag_needed:
     exit
+
+  any_already_seen:
+    err "duplicate 'Anything else' clause"
+    exit
+
+  any_must_be_last:
+    err "'Anything else' must be the last clause in the insertion mode definition"
+    exit
+
 
   goto_always:
     ; ...
@@ -359,8 +499,14 @@ macro mode? name*,index_name*
     exit
 
   finish:
-    arrange var, =purge ?, =setup, =stride_type, =stride_type_tail
+    check any_seen
+    jno missing_any
+
+    arrange var, =purge ?, =setup, =stride_type, =stride_type_tail, =resolve_tag_stride_tail
     assemble var
+    exit
+  missing_any:
+    err "'Anything else' clause is mandatory"
     exit
     
   end calminstruction

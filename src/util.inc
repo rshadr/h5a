@@ -13,6 +13,11 @@ calminstruction unimplemented?
 end calminstruction
 
 
+calminstruction unreachable?
+  asm ud2
+end calminstruction
+
+
 if 0
   calminstruction validate_jxx? opc*
     match =jae?, opc
