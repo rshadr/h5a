@@ -1,4 +1,10 @@
 
+struct H5aString
+  data     dq ?
+  size     dd ?
+  capacity dd ?
+ends
+
 struct CharacterQueue
   data dq ?
   size dd ?
@@ -7,12 +13,24 @@ struct CharacterQueue
   back_idx dd ?
 ends
 
+struct DoctypeToken
+  name            rb sizeof.H5aString
+  public_id       rb sizeof.H5aString
+  system_id       rb sizeof.H5aString
+  have_public_id  db ?
+  have_system_id  db ?
+ends
+
 struct H5aParser
   input_stream.get_char_cb  dq ?
   input_stream.user_data    dq ?
+  sink.vtable               dq ?
+  sink.user_data            dq ?
 
   tokenizer.char_ref        dq ?
   tokenizer.input_buffer    rb sizeof.CharacterQueue
+  tokenizer.temp_buffer     rb sizeof.CharacterQueue
+  tokenizer.doctype         rb sizeof.DoctypeToken
   tokenizer.newline_count   dw ?
 
   tokenizer.state           db ?
@@ -176,8 +194,10 @@ end enum
 ;; Public
 ;;
 struct H5aParserCreateInfo
-  get_char   dq ?
-  user_data  dq ?
+  input_get_char   dq ?
+  input_user_data  dq ?
+  sink_vtable      dq ?
+  sink_user_data   dq ?
 ends
 
 struct H5aSinkVTable

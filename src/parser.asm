@@ -9,6 +9,8 @@ include "local.inc"
 
 format ELF64
 
+extrn _h5aStringCreate
+extrn _h5aStringDestroy
 extrn _CharacterQueueConstruct
 extrn _CharacterQueueDestroy
 extrn _h5aTokenizerMain
@@ -34,14 +36,30 @@ h5aCreateParser:
     rep stosb
   end with_saved_regs
 
-  mov rax, qword [rdi + H5aParserCreateInfo.get_char]
+  mov rax, qword [rdi + H5aParserCreateInfo.input_get_char]
   mov qword [rsi + H5aParser.input_stream.get_char_cb], rax
-  mov rax, qword [rdi + H5aParserCreateInfo.user_data]
-  mov qword [rsi + H5aParser.input_stream.user_data], rax
+  mov rcx, qword [rdi + H5aParserCreateInfo.input_user_data]
+  mov qword [rsi + H5aParser.input_stream.user_data], rcx
+  mov rdx, qword [rdi + H5aParserCreateInfo.sink_vtable]
+  mov qword [rsi + H5aParser.sink.vtable], rdx
+  mov r11, qword [rdi + H5aParserCreateInfo.sink_user_data]
+  mov qword [rdi + H5aParser.sink.user_data], r11
 
-  with_saved_regs rdi, rsi
-    lea rdi, [rsi + H5aParser.tokenizer.input_buffer]
+  with_saved_regs r12, r13
+    ;r13 for alignment
+    mov r12, rsi
+
+    lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
     call _CharacterQueueConstruct
+    lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
+    call _CharacterQueueConstruct
+
+    lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
+    call _h5aStringCreate
+    lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.public_id]
+    call _h5aStringCreate
+    lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.system_id]
+    call _h5aStringCreate
   end with_saved_regs
 
   ;mov qword [rsi + H5aParser.tokenizer.state], DATA_STATE
@@ -56,9 +74,20 @@ h5aDestroyParser:
 ;; RDI: H5aParser *parser
   with_saved_regs r12
     mov r12, rdi
+
     lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
     call _CharacterQueueDestroy
+    lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
+    call _CharacterQueueDestroy
+
+    lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
+    call _h5aStringDestroy
+    lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.public_id]
+    call _h5aStringDestroy
+    lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.system_id]
+    call _h5aStringDestroy
   end with_saved_regs
+
   mov eax, H5A_SUCCESS
   ret
 
@@ -67,8 +96,6 @@ h5aResumeParser:
 ;; -> [see _h5a_Tokenizer_main]
   push r12
   mov  r12, rdi
-  ;lea  rax, [_h5aTokenizerMain]
-  ;jmp  rax
   jmp _h5aTokenizerMain
 
 section '.rodata'

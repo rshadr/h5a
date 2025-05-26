@@ -10,10 +10,14 @@ include "tokenizer_states.g"
 
 format ELF64
 
+extrn _h5aStringPushBackAscii
+extrn _h5aStringPushBackUnicode
 extrn _h5aTokenizerPrefetchChars
 extrn _h5aTokenizerEat
 extrn _h5aTokenizerEatSensitive
 extrn _h5aTokenizerEatInsensitive
+extrn _h5aTokenizerCreateDoctype
+extrn _h5aTokenizerEmitDoctype
 extrn _h5aTokenizerEmitCharacter
 extrn _h5aTokenizerEmitEof
 extrn _h5aTokenizerHaveAppropriateEndTag
@@ -1790,31 +1794,54 @@ state beforeDoctypeName,BEFORE_DOCTYPE_NAME_STATE
     ret
 
   [[ASCII upper alpha]]
-    ;; ...
-    mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
+    with_stack_frame
+      call _h5aTokenizerCreateDoctype
+      mov rcx, r10
+      sub cl, 0x20
+      ;append_doctype_name_ascii! cl
+      ; ...
+      mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
+    end with_stack_frame
     xor al,al
     ret
 
   [[U+0000 NULL]]
-    ;; ...
-    mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
+    with_stack_frame
+      ;; ...
+      call _h5aTokenizerCreateDoctype
+      ;append_doctype_name! 0xFFFD
+      mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
+    end with_stack_frame
     xor al,al
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    ;; ...
-    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
-    ;; emit
+    with_stack_frame
+      ;; ...
+      mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+      ;; emit
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
     xor al,al
     ret
 
   [[EOF]]
-    ;; ...
+    with_stack_frame
+      call _h5aTokenizerCreateDoctype
+      ;; ...
+    end with_stack_frame
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ;; ...
-    mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
+    with_stack_frame
+public the_edge
+the_edge:
+      call _h5aTokenizerCreateDoctype
+      lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
+      mov rsi, r10
+      call _h5aStringPushBackUnicode
+      mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
+    end with_stack_frame
     xor al,al
     ret
 

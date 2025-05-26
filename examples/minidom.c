@@ -1,3 +1,8 @@
+/*
+ * Copyright 2025 rshadr
+ * See LICENSE for details
+ */
+
 #include <stddef.h>
 #include <inttypes.h>
 #include <unistd.h>
@@ -130,6 +135,19 @@ static void mdHandleDestroy (MdHandle handle);
 static void mdHandleVectorCreate (MdHandleVector *vec);
 static void mdHandleVectorDestroy (MdHandleVector *vec);
 
+#if 0
+static void mdNode_ctor (void *user_data);
+static void mdNode_dtor (void *user_data);
+static void mdDoctype_ctor (void *user_data);
+static void mdDoctype_dtor (void *user_data);
+static void mdDocument_ctor (void *user_data);
+static void mdDocument_dtor (void *user_data);
+static void mdElement_ctor (void *user_data);
+static void mdElement_dtor (void *user_data);
+static void mdAttribute_ctor (void *user_data);
+static void mdAttribute_dtor (void *user_data);
+#endif
+
 static void *mdSinkFinish (H5aSink *self);
 static void mdSinkParseError (H5aSink *self, char const *msg);
 [[nodiscard]] static H5aHandle mdSinkGetTemplateContents (H5aSink *self, H5aHandle target);
@@ -137,9 +155,11 @@ static void mdSinkParseError (H5aSink *self, char const *msg);
 static void mdSinkSetQuirksMode (H5aSink *self, H5aQuirksMode mode);
 static bool mdSinkSameNode (H5aSink *self, H5aHandle x, H5aHandle y);
 static void mdSinkAppend (H5aSink *self, H5aHandle parent, H5A_NODE_OR_TEXT_HANDLE(child));
-static void mdSinkAppendDoctypeToDocument (H5aSink *self, void *name, void *public_id, void *system_id);
+static void mdSinkAppendDoctypeToDocument (H5aSink *self, H5aStringView name,
+  H5aStringView public_id, H5aStringView system_id);
 static void mdSinkRemoveFromParent (H5aSink *self, H5aHandle target);
 static void mdSinkReparentChildren (H5aSink *self, H5aHandle node, H5aHandle new_parent);
+static H5aTag mdSinkGetTagByName (H5aSink *self, H5aStringView name);
 static void mdSinkDestroyHandle (H5aSink *self, H5aHandle handle);
 
 static const H5aSinkVTable k_minidom_sink_vtable = {
@@ -162,7 +182,7 @@ static const H5aSinkVTable k_minidom_sink_vtable = {
   .complete_script = NULL,
   .is_mathml_annotation_xml_integration_point = NULL,
 
-  .get_tag_by_name = NULL,
+  .get_tag_by_name = mdSinkGetTagByName,
   .destroy_handle = mdSinkDestroyHandle,
 };
 
@@ -339,10 +359,12 @@ mdHandleVectorPop (MdHandleVector *vec)
 static void
 mdHandleVectorDestroy (MdHandleVector *vec)
 {
-  for (size_t i = 0; i < vec->size; ++i) {
+  for (size_t i = 0; i < vec->size; ++i)
     mdHandleDestroy(vec->data[i]);
-    vec->data[i] = (MdHandle){0};
-  }
+  free(vec->data);
+  vec->data = NULL;
+  vec->size = 0;
+  vec->capacity = 0;
 }
 
 static void *
@@ -415,7 +437,10 @@ mdSinkAppend (H5aSink *self, H5aHandle parent, H5A_NODE_OR_TEXT_HANDLE(child))
 
 
 static void
-mdSinkAppendDoctypeToDocument (H5aSink *self, void *name, void *public_id, void *system_id)
+mdSinkAppendDoctypeToDocument (H5aSink *self, 
+                               H5aStringView name,
+                               H5aStringView public_id,
+                               H5aStringView system_id)
 {
   (void) self;
   (void) name;
@@ -441,6 +466,16 @@ mdSinkReparentChildren (H5aSink *self, H5aHandle node, H5aHandle new_parent)
 }
 
 
+static H5aTag
+mdSinkGetTagByName (H5aSink *self, H5aStringView name)
+{
+  (void) self;
+  (void) name;
+  abort();
+  return H5A_PLACEHOLDER_TAG;
+}
+
+
 static void
 mdSinkDestroyHandle (H5aSink *self, H5aHandle handle)
 {
@@ -461,15 +496,19 @@ main (int argc, char *argv[])
   uint8_t parser_mem[k_h5a_parserSize];
   H5aParser *parser = (H5aParser *)(parser_mem);
 
+  MdSink sink = { 0 };
+
   mdInputStreamCreate(&stream, file_name);
 
   H5aParserCreateInfo parser_create_info = {
-    .get_char = mdInputStreamGetChar,
-    .user_data = (void *)(&stream),
+    .input_get_char = mdInputStreamGetChar,
+    .input_user_data = (void *)(&stream),
+    .sink_vtable = &k_minidom_sink_vtable,
+    .sink_user_data = (H5aSink *)(&sink),
   };
 
   h5aCreateParser(&parser_create_info, parser);
-  h5aResumeParser(parser);
+    h5aResumeParser(parser);
   h5aDestroyParser(parser);
 
   mdInputStreamDestroy(&stream);

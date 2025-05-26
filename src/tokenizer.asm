@@ -10,6 +10,7 @@ include "local.inc"
 format ELF64
 
 
+extrn _h5aStringClear
 extrn _CharacterQueuePushBack
 extrn _CharacterQueuePopFront
 extrn _CharacterQueueSubscript
@@ -23,6 +24,8 @@ public _h5aTokenizerError
 public _h5aTokenizerEat
 public _h5aTokenizerEatSensitive
 public _h5aTokenizerEatInsensitive
+public _h5aTokenizerCreateDoctype
+public _h5aTokenizerEmitDoctype
 public _h5aTokenizerEmitCharacter
 public _h5aTokenizerEmitEof
 public _h5aTokenizerHaveAppropriateEndTag
@@ -167,7 +170,17 @@ _h5aTokenizerEatSensitive:
   jmp _h5aTokenizerEatGeneric
 
 _h5aTokenizerCreateDoctype:
-  ; ...
+  ;; R12 (s): H5aParser *parser
+  with_stack_frame
+    lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
+    call _h5aStringClear
+    lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.public_id]
+    call _h5aStringClear
+    lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.system_id]
+    call _h5aStringClear
+    mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.have_public_id], 0x00
+    mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.have_system_id], 0x00
+  end with_stack_frame
   ret
 
 _h5aTokenizerCreateTag:
@@ -194,6 +207,15 @@ _h5aTokenizerEmitToken:
     call _h5aTreeBuilderAcceptToken
   end with_stack_frame
   ret
+
+
+_h5aTokenizerEmitDoctype:
+;; R12 (s); H5aParser *parser
+  lea rdi, [r12 + H5aParser.tokenizer.doctype]
+  xor rsi,rsi
+  mov sil, TOKEN_DOCTYPE
+  jmp _h5aTokenizerEmitToken
+
 
 _h5aTokenizerEmitCharacter:
 ;; R12 (s): H5aParser *parser
@@ -234,6 +256,7 @@ _h5aTokenizerEmitEof:
   leave
   ret
 
+
 _h5aTokenizerHaveAppropriateEndTag:
   ;; R12 (s): H5aParser *parser
   ;; -> RAX (AL): bool result
@@ -243,6 +266,7 @@ _h5aTokenizerHaveAppropriateEndTag:
   xor rax,rax
   leave
   ret
+
 
 _h5aTokenizerFlushEntityChars:
   ;; R12 (s): H5aParser *parser
@@ -280,6 +304,7 @@ _h5aTokenizerCharRefInAttr:
   je .yes
   cmp cl, ATTRIBUTE_VALUE_UNQUOTED_STATE
   je .yes
+
   ret
 
 .yes:
@@ -384,6 +409,7 @@ _h5aTokenizerGetChar:
 
 
 _h5aTokenizerMain:
+;; stack entry: [r12, RET]
 ;; R12 (omni:lost): H5aParser *
 ;; -> EAX: enum H5aResult
   push r10

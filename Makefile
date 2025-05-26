@@ -14,6 +14,7 @@ SOURCES =\
 	entities\
 	insertion_modes\
 	parser\
+	string\
 	tokenizer\
 	tokenizer_states\
 	treebuilder\
@@ -27,6 +28,8 @@ build/insertion_modes.o: src/insertion_modes.asm \
 	src/insertion_modes.g src/local.inc src/util.inc
 build/parser.o: src/parser.asm \
 	src/local.inc src/util.inc
+build/string.o: src/string.asm \
+	src/local.inc src/util.inc
 build/tokenizer.o: src/tokenizer.asm \
 	src/local.inc src/util.inc
 build/tokenizer_states.o: src/tokenizer_states.asm \
@@ -35,7 +38,7 @@ build/treebuilder.o: src/treebuilder.asm \
 	src/local.inc src/util.inc
 
 TESTS =\
-	default
+	string
 
 TEST_BINS = $(patsubst %, build/test/%, $(TESTS))
 TEST_DEPS = $(patsubst %, %.d, $(TEST_BINS))

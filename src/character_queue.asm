@@ -10,6 +10,7 @@ include "local.inc"
 format ELF64
 
 extrn calloc
+extrn reallocarray
 extrn free
 
 public _CharacterQueueConstruct
@@ -23,11 +24,6 @@ section '.rodata'
 _CharacterQueue_init_capacity:
   dd 16
 
-calloc_cb:
-  dq calloc
-free_cb:
-  dq free
-
 section '.text' executable
 
 _CharacterQueueConstruct:
@@ -40,7 +36,7 @@ _CharacterQueueConstruct:
     mov dil, 8
     mov rsi,rsi
     mov esi, dword [_CharacterQueue_init_capacity]
-    call qword [calloc_cb]
+    call calloc
     ; XXX: check
 
     mov qword [rbx + CharacterQueue.data], rax
@@ -57,7 +53,7 @@ _CharacterQueueDestroy:
 
   with_saved_regs rdi
     mov rdi, [rdi + CharacterQueue.data]
-    call qword [free_cb]
+    call free
   end with_saved_regs
 
   ;zero_init rdi, sizeof.CharacterQueue

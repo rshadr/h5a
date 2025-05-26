@@ -211,6 +211,11 @@ typedef struct H5aHandle_s {
   void *y;
 } H5aHandle;
 
+typedef struct H5aStringView_s {
+  uint8_t const *data;
+  size_t size;
+} H5aStringView;
+
 /*
  * Hack to avoid stack-based parameter passing.
  * Handing in the handle like this is slightly
@@ -242,13 +247,13 @@ typedef struct H5aSinkVTable_s {
   H5aHandle (*create_element)
     (H5aSink *self, void *name, void *attrs);
   H5aHandle (*create_comment)
-    (H5aSink *self, void *text);
+    (H5aSink *self, H5aStringView text);
   void (*append)
     (H5aSink *self, H5aHandle parent, H5A_NODE_OR_TEXT_HANDLE(child));
   void* (*append_before_sibling)
     (H5aSink *self, H5A_NODE_OR_TEXT_HANDLE(child));
   void (*append_doctype_to_document)
-    (H5aSink *self, void *name, void *public_id, void *system_id);
+    (H5aSink *self, H5aStringView name, H5aStringView public_id, H5aStringView system_id);
   void (*add_attrs_if_missing)
     (H5aSink *self, H5aHandle target);
   void (*remove_from_parent)
@@ -266,7 +271,7 @@ typedef struct H5aSinkVTable_s {
    * These are unique to h5a
    */
   H5aTag (*get_tag_by_name)
-    (H5aSink *self, void *name);
+    (H5aSink *self, H5aStringView name);
   void (*destroy_handle)
     (H5aSink *self, H5aHandle handle);
 } H5aSinkVTable;
@@ -285,8 +290,10 @@ typedef struct H5aParser_s H5aParser;
 extern const size_t k_h5a_parserSize;
 
 typedef struct H5aParserCreateInfo_s {
-  char32_t (*get_char) (void *user_data);
-  void *user_data;
+  char32_t (*input_get_char) (void *user_data);
+  void *input_user_data;
+  const H5aSinkVTable *sink_vtable;
+  void *sink_user_data;
 } H5aParserCreateInfo;
 
 H5aResult h5aCreateParser (H5aParserCreateInfo const *create_info,
