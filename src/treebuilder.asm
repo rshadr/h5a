@@ -112,13 +112,15 @@ _h5aTreeBuilderInsertCharacter:
 
 _h5aTreeBuilderAcceptToken:
   ;; R12 (s): H5aParser *parser
-  ;; RDI (SIL): e8 type
-  ;; RSI: union token
+  ;; RDI: union token
+  ;; RSI (SIL): e8 type
   ;; -> void
-  with_saved_regs rbx, r13, r14
+  with_saved_regs rbx, rcx, r13, r14, r15
+    ;rcx for alignment
     lea rbx, [_k_h5a_TreeBuilder_handlerTable]
-    mov r13, rdi ;type
-    mov r14, rsi ;token
+    mov r13, rdi ;token
+    mov r14, rsi ;type
+    mov r15, qword [r12 + H5aParser.sink.vtable]
 
 .loop:
     xor rax,rax

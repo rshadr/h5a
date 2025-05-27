@@ -24,6 +24,16 @@ _h5aTreeBuilderHandler.DUMMY.eof:
   mov al, RESULT_EOF_REACHED
   ret
 
+quirksCheck:
+  ; ...
+  xor al,al
+  ret
+
+limitedQuirksCheck:
+  ; ...
+  xor al,al
+  ret
+
 
 mode initial,INITIAL_MODE
 
@@ -37,10 +47,54 @@ mode initial,INITIAL_MODE
     ret
 
   [[DOCTYPE]]
-    ; ...
-    mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HTML_MODE
-    xor al,al
-    ret
+public the_razor
+label the_razor
+
+    namespace initial_doctype
+      with_stack_frame
+.check1:
+        ; ...
+        mov al, byte [r13 + DoctypeToken.have_public_id]
+        test al,al
+        jnz .action1
+        mov al, byte [r13 + DoctypeToken.have_system_id]
+        jz .action2
+        ; ...
+.action1:
+        ; XXX: parse error
+.action2:
+        mov rdi, qword [r12 + H5aParser.sink.user_data]
+
+        mov rsi, qword [r13 + DoctypeToken.name + H5aString.data]
+        xor rdx,rdx
+        mov edx, dword [r13 + DoctypeToken.name + H5aString.size]
+
+        xor rcx,rcx
+        xor r8,r8
+        mov al, byte [r13 + DoctypeToken.have_public_id]
+        test al,al
+        cmovnz rcx, qword [r13 + DoctypeToken.public_id + H5aString.data]
+        cmovnz r8d, dword [r13 + DoctypeToken.public_id + H5aString.size]
+
+        xor r9,r9
+        xor r11,r11
+        mov al, byte [r13 + DoctypeToken.have_system_id]
+        test al,al
+        cmovnz r8, qword [r13 + DoctypeToken.system_id + H5aString.data]
+        cmovnz r11d, dword [r13 + DoctypeToken.system_id + H5aString.size]
+        sub rsp, 8
+        push r11
+  
+        call qword [r15 + H5aSinkVTable.append_doctype_to_document]
+
+.check3:
+        ; ...
+        mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HTML_MODE
+.finish:
+      end with_stack_frame
+      xor al,al
+      ret
+    end namespace
 
   [[Anything else]]
     ; ...

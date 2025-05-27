@@ -19,6 +19,7 @@ extrn grapheme_encode_utf8
 public _h5aStringCreate
 public _h5aStringDestroy
 public _h5aStringClear
+public _h5aStringMaybeGrow
 public _h5aStringPushBackAscii
 public _h5aStringPutChunk
 public _h5aStringPushBackUnicode
@@ -52,10 +53,15 @@ with_saved_regs rbx
 
   mov rdi, [rbx + H5aString.data]
   call free
+  xor rax,rax
+  mov qword [rbx + H5aString.data], rax
+  mov dword [rbx + H5aString.size], eax
+  mov dword [rbx + H5aString.capacity], eax
 end with_saved_regs
   ret
 
 _h5aStringClear:
+;; leaf
 ;; RDI (arg): H5aString *string
 ;; -> void
   mov rsi, rdi
@@ -80,6 +86,7 @@ with_saved_regs rbx
   jl .finish
 
   shl ecx, 1
+  jo .tooLarge
   mov dword [rbx + H5aString.capacity], ecx
   mov rdi, qword [rbx + H5aString.data]
   xor rsi,rsi
@@ -89,6 +96,10 @@ with_saved_regs rbx
   call reallocarray
 
   mov qword [rbx + H5aString.data], rax
+  jmp .finish
+
+.tooLarge:
+  unimplemented
 
 .finish:
 end with_saved_regs
@@ -106,8 +117,7 @@ _h5aStringPushBackAscii:
     mov r13, rsi
     mov rbx, rdi
     xor rsi,rsi
-    mov esi, dword [rbx + H5aString.size]
-    inc esi
+    inc si
     call _h5aStringMaybeGrow
 
     mov rdx, qword [rbx + H5aString.data]
@@ -129,18 +139,17 @@ with_saved_regs rbx, r13, r15
 
   xor rsi,rsi
   mov esi, edx
-  add esi, dword [rbx + H5aString.size]
   call _h5aStringMaybeGrow
 
   xor rcx,rcx
   mov ecx, dword [rbx + H5aString.size]
-  mov rdi, qword [rbx + H5aString.data]
-  lea rdi, [rdi + rcx*1]
+  mov rax, qword [rbx + H5aString.data]
+  lea rdi, [rax + rcx*1]
   mov rsi, r13
   mov rdx, r15
   call memcpy
 
-  add dword [rbx + H5aString.size], edx
+  add dword [rbx + H5aString.size], r15d
 end with_saved_regs
   ret
 
@@ -148,31 +157,27 @@ _h5aStringPushBackUnicode:
 ;; RDI (arg): H5aString *string
 ;; RSI (ESI): char32_t c
 ;; -> void
-;;with_stack_frame
-push rbp
-mov rbp, rsp
-  ;sub rsp, 16 ;char utf8[16];
-  ;sub rsp, 8 ;size_t written;
-  sub rsp, (16 + 8)
-  with_saved_regs rbx
-    ;push rbx ;save string
-    mov rbx, rdi
+  with_stack_frame
+    ;sub rsp, 16 ;char utf8[16];
+    ;sub rsp, 8 ;size_t written;
+    sub rsp, (16 + 8)
+    with_saved_regs rbx
+      ;push rbx ;save string
+      mov rbx, rdi
 
-    mov rdi, rsi
-    lea rsi, [rbp - 0]
-    xor rdx,rdx
-    mov dl, 16
-    call grapheme_encode_utf8
-    mov qword [rbp - 16], rax
+      mov rdi, rsi
+      lea rsi, [rbp - 16]
+      xor rdx,rdx
+      mov dl, 16
+      call grapheme_encode_utf8
+      mov qword [rbp - (16 + 8)], rax
 
-    mov rdi, rbx
-    lea rsi, [rbp - 0]
-    mov rdx, qword [rbp - 16]
-    call _h5aStringPutChunk
-  end with_saved_regs
-;;end with_stack_frame
-  mov rsp, rbp
-  pop rbp
+      mov rdi, rbx
+      lea rsi, [rbp - 16]
+      mov rdx, qword [rbp - (16 + 8)]
+      call _h5aStringPutChunk
+    end with_saved_regs
+  end with_stack_frame
   ret
 
 section '.rodata'

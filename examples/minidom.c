@@ -17,6 +17,12 @@
 #include <grapheme.h>
 #include <h5a.h>
 
+struct hstring {
+  char *data;
+  uint32_t size;
+  uint32_t capacity;
+};
+
 typedef struct MdInputStream_s {
   char const *p;
   char const *end;
@@ -446,6 +452,8 @@ mdSinkAppendDoctypeToDocument (H5aSink *self,
   (void) name;
   (void) public_id;
   (void) system_id;
+
+  printf("doctype name: %s\n", name.data);
 }
 
 

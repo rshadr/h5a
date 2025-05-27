@@ -1,6 +1,6 @@
 #include <stddef.h>
 #include <uchar.h>
-#include <stdint.h>
+#include <inttypes.h>
 #include <stdarg.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <grapheme.h>
 #include <h5a.h>
@@ -145,17 +146,28 @@ main (int argc, char *argv[])
 
   struct hstring s = { 0 };
   _h5aStringCreate(&s);
+  printf("data base: %p\n", (void *)(s.data));
+  printf("size = %"PRIu32"\n", s.size);
   _h5aStringPushBackUnicode(&s, U'€');
-  _h5aStringPushBackUnicode(&s, U'€');
-  _h5aStringPushBackUnicode(&s, U'€');
-  _h5aStringPushBackAscii(&s, 'a');
-  _h5aStringPushBackAscii(&s, 'a');
-  _h5aStringPushBackAscii(&s, 'a');
-  _h5aStringPushBackAscii(&s, 'a');
-  _h5aStringPushBackAscii(&s, 'a');
-  _h5aStringPushBackAscii(&s, 'a');
+  printf("data base: %p\n", (void *)(s.data));
 
-  printf("string value: %s\n", s.data);
+  printf("size = %"PRIu32"\n", s.size);
+  memcpy(&s.data[s.size], "€", strlen("€"));
+  s.size += strlen("€");
+
+  _h5aStringPushBackUnicode(&s, U'€');
+  printf("data base: %p\n", (void *)(s.data));
+#if 0
+  _h5aStringPushBackUnicode(&s, U'€');
+  _h5aStringPushBackAscii(&s, 'a');
+  _h5aStringPushBackAscii(&s, 'a');
+  _h5aStringPushBackAscii(&s, 'a');
+  _h5aStringPushBackAscii(&s, 'a');
+  _h5aStringPushBackAscii(&s, 'a');
+  _h5aStringPushBackAscii(&s, 'a');
+#endif
+
+  //printf("string value: %s\n", s.data);
   _h5aStringDestroy(&s);
 
   return 0;

@@ -180,6 +180,7 @@ _h5aTokenizerCreateDoctype:
     call _h5aStringClear
     mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.have_public_id], 0x00
     mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.have_system_id], 0x00
+    mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x00
   end with_stack_frame
   ret
 
@@ -412,9 +413,9 @@ _h5aTokenizerMain:
 ;; stack entry: [r12, RET]
 ;; R12 (omni:lost): H5aParser *
 ;; -> EAX: enum H5aResult
-  push r10
+  push r13
   push rbx
-  xor r10,r10
+  xor r13,r13
 
 .charLoop:
   ; XXX: check SPC_ACTION
@@ -450,7 +451,7 @@ _h5aTokenizerMain:
       ;;mov  rdi, qword [r12 + H5aParser.input_stream.user_data]
       ;;call qword [r12 + H5aParser.input_stream.get_char_cb]
       call _h5aTokenizerGetChar
-      mov  r10d, eax
+      mov  r13d, eax
 
 .charLoop.hashChar:
       ;; hash result (RAX):
@@ -460,9 +461,9 @@ _h5aTokenizerMain:
       xor rax,rax
       xor rdi,rdi
 
-      cmp   r10d, 0x7F
+      cmp   r13d, 0x7F
       seta  al
-      cmp   r10d, (not 0x00)
+      cmp   r13d, (not 0x00)
       sete  dil
       add   al, dil
 
@@ -477,8 +478,8 @@ _h5aTokenizerMain:
       movzx  rax, byte [r12 + H5aParser.tokenizer.state]
       shl    rax, (bsr (128 * 8))
       lea    rax, [rbx + rax] ;load state LUT base
-      mov    rax, qword [rax + r10 * 8] ;load handler
-      mov    rdi, r10
+      mov    rax, qword [rax + r13 * 8] ;load handler
+      mov    rdi, r13
       call   rax
 
       test al, RESULT_BIT_AGAIN
@@ -490,7 +491,7 @@ _h5aTokenizerMain:
 
 .charLoop.unicodeOrEofLoop:
       ; XXX: remove when all states are coded
-      cmp r10d, (not 0x00)
+      cmp r13d, (not 0x00)
       likely je .exit
 
       xor rax,rax
@@ -509,7 +510,7 @@ _h5aTokenizerMain:
 
 .exit:
     pop rbx
-    pop r10
+    pop r13
     pop r12 ;upscope
     xor rax,rax
     ret

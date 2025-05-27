@@ -83,15 +83,19 @@ macro state? name*,index_name*
       arrange var, =label l
       assemble var
 
-    arrange var, =lea =rdi, =[seq_label=]
-    assemble var
-    arrange var, =mov =rsi, =sizeof.seq_label
-    assemble var
-    arrange var, =call func
-    assemble var
+    asm with_stack_frame
+      arrange var, =lea =rdi, =[seq_label=]
+      assemble var
+      arrange var, =mov =rsi, =sizeof.seq_label
+      assemble var
+      arrange var, =call func
+      assemble var
+    asm end with_stack_frame
+
     asm test al,al
     arrange var, =jz beyond
     assemble var
+
     arrange var, =seq_store seq_label, seq
     assemble var
     exit

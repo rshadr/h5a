@@ -61,7 +61,7 @@ state data,DATA_STATE
   [[U+0000 NULL]]
     with_stack_frame
       ; XXX: error
-      mov rdi, r10
+      mov rdi, r13
       call _h5aTokenizerEmitCharacter
       xor al,al
     end with_stack_frame
@@ -943,7 +943,7 @@ state scriptDataDoubleEscapeStart,SCRIPT_DATA_DOUBLE_ESCAPE_START_STATE
       cmovz cx, dx ;XXX
       mov byte [r12 + H5aParser.tokenizer.state], cl
 
-      mov rdi, r10
+      mov rdi, r13
       call _h5aTokenizerEmitCharacter
       mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_ESCAPED_STATE
       xor al,al
@@ -953,7 +953,7 @@ state scriptDataDoubleEscapeStart,SCRIPT_DATA_DOUBLE_ESCAPE_START_STATE
   [[ASCII upper alpha]]
     with_stack_frame
       ; ...
-      mov rdi, r10
+      mov rdi, r13
       call _h5aTokenizerEmitCharacter
       xor al,al
     end with_stack_frame
@@ -962,7 +962,7 @@ state scriptDataDoubleEscapeStart,SCRIPT_DATA_DOUBLE_ESCAPE_START_STATE
   [[ASCII lower alpha]]
     with_stack_frame
       ; ...
-      mov rdi, r10
+      mov rdi, r13
       call _h5aTokenizerEmitCharacter
       xor al,al
     end with_stack_frame
@@ -1163,7 +1163,7 @@ state scriptDataDoubleEscapeEnd,SCRIPT_DATA_DOUBLE_ESCAPE_END_STATE
       test al,al
       cmovz cx, dx
       mov byte [r12 + H5aParser.tokenizer.state], cl
-      mov rdi, r10
+      mov rdi, r13
       call _h5aTokenizerEmitCharacter
       xor al,al
     end with_stack_frame
@@ -1172,7 +1172,7 @@ state scriptDataDoubleEscapeEnd,SCRIPT_DATA_DOUBLE_ESCAPE_END_STATE
   [[ASCII upper alpha]]
     with_stack_frame
       ; ...
-      mov rdi, r10
+      mov rdi, r13
       call _h5aTokenizerEmitCharacter
       xor al,al
     end with_stack_frame
@@ -1181,7 +1181,7 @@ state scriptDataDoubleEscapeEnd,SCRIPT_DATA_DOUBLE_ESCAPE_END_STATE
   [[ASCII lower alpha]]
     with_stack_frame
       ; ...
-      mov rdi, r10
+      mov rdi, r13
       call _h5aTokenizerEmitCharacter
       xor al,al
     end with_stack_frame
@@ -1796,10 +1796,10 @@ state beforeDoctypeName,BEFORE_DOCTYPE_NAME_STATE
   [[ASCII upper alpha]]
     with_stack_frame
       call _h5aTokenizerCreateDoctype
-      mov rcx, r10
-      sub cl, 0x20
-      ;append_doctype_name_ascii! cl
-      ; ...
+      lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
+      mov rsi, r13
+      sub sil, 0x20
+      call _h5aStringPushBackAscii
       mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
     end with_stack_frame
     xor al,al
@@ -1809,7 +1809,10 @@ state beforeDoctypeName,BEFORE_DOCTYPE_NAME_STATE
     with_stack_frame
       ;; ...
       call _h5aTokenizerCreateDoctype
-      ;append_doctype_name! 0xFFFD
+      lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
+      xor rsi,rsi
+      mov si, 0xFFFD
+      call _h5aStringPushBackUnicode
       mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
     end with_stack_frame
     xor al,al
@@ -1818,8 +1821,9 @@ state beforeDoctypeName,BEFORE_DOCTYPE_NAME_STATE
   [[U+003E GREATER-THAN SIGN]]
     with_stack_frame
       ;; ...
+      call _h5aTokenizerCreateDoctype
+      mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x1
       mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
-      ;; emit
       call _h5aTokenizerEmitDoctype
     end with_stack_frame
     xor al,al
@@ -1827,19 +1831,21 @@ state beforeDoctypeName,BEFORE_DOCTYPE_NAME_STATE
 
   [[EOF]]
     with_stack_frame
-      call _h5aTokenizerCreateDoctype
       ;; ...
+      call _h5aTokenizerCreateDoctype
+      mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x1
+      call _h5aTokenizerEmitDoctype
     end with_stack_frame
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
     with_stack_frame
-public the_edge
-the_edge:
       call _h5aTokenizerCreateDoctype
-      lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
-      mov rsi, r10
-      call _h5aStringPushBackUnicode
+      if 1
+        lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
+        mov rsi, r13
+        call _h5aStringPushBackUnicode
+      end if
       mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
     end with_stack_frame
     xor al,al
@@ -1859,27 +1865,52 @@ state doctypeName,DOCTYPE_NAME_STATE
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    ;; emit
-    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    with_stack_frame
+      mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
     xor al,al
     ret
 
   [[ASCII upper alpha]]
-    ;; ...
+    with_stack_frame
+      sub dil, 0x20
+      mov rsi, rdi
+      lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
+      call _h5aStringPushBackAscii
+    end with_stack_frame
     xor al,al
     ret
 
   [[U+0000 NULL]]
-    ;; ...
+    with_stack_frame
+      ;; ...
+      lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
+      xor rsi,rsi
+      mov si, 0xFFFD
+      call _h5aStringPushBackUnicode
+    end with_stack_frame
     xor al,al
     ret
 
   [[EOF]]
-    ;; ...
+    with_stack_frame
+      ;; ...
+      mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x1
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ;; ...
+    with_stack_frame
+      public the_edge
+      the_edge:
+      if 1
+        lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
+        mov rsi, r13
+        call _h5aStringPushBackUnicode
+      end if
+    end with_stack_frame
     xor al,al
     ret
 
@@ -1887,6 +1918,16 @@ end state
 
 
 state afterDoctypeName,AFTER_DOCTYPE_NAME_STATE
+
+  [[Case-insensitively "PUBLIC"]]
+    mov byte [r12 + H5aParser.tokenizer.state], AFTER_DOCTYPE_PUBLIC_KEYWORD_STATE
+    xor al,al
+    ret
+
+  [[Case-insensitively "SYSTEM"]]
+    mov byte [r12 + H5aParser.tokenizer.state], AFTER_DOCTYPE_SYSTEM_KEYWORD_STATE
+    xor al,al
+    ret
 
   [[U+0009 CHARACTER TABULATION]]
   [[U+000A LINE FEED]]
@@ -1896,18 +1937,25 @@ state afterDoctypeName,AFTER_DOCTYPE_NAME_STATE
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    ; emit
     mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    call _h5aTokenizerEmitDoctype
     xor al,al
     ret
 
   [[EOF]]
-    ;; ...
+    with_stack_frame
+      ;; ...
+      mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x1
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
+    with_stack_frame
     ;; XXX: local-scoped labels???
-    mov byte [r12 + H5aParser.tokenizer.state], BOGUS_DOCTYPE_STATE
+      mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x1
+      mov byte [r12 + H5aParser.tokenizer.state], BOGUS_DOCTYPE_STATE
+    end with_stack_frame
     mov al, RESULT_RECONSUME
     ret
 

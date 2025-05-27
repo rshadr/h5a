@@ -191,6 +191,113 @@ macro with_stack_frame?
 end macro
 
 
+calminstruction pick_me?
+  asm push rax
+  asm push rcx
+  asm push rdx
+  asm push rbx
+  asm push rbp
+  asm push rsi
+  asm push rdi
+
+  asm push r8
+  asm push r9
+  asm push r10
+  asm push r11
+  asm push r12
+  asm push r13
+  asm push r14
+  asm push r15
+
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm0
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm1
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm2
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm3
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm4
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm5
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm6
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm7
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm8
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm9
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm10
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm11
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm12
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm13
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm14
+  asm sub rsp, 32
+  asm vmovdqu [rsp], ymm15
+
+
+  ; XXX: ...
+
+
+  asm vmovdqu ymm15, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm14, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm13, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm12, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm11, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm10, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm9, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm8, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm7, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm6, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm5, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm4, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm3, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm2, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm1, [rsp]
+  asm add rsp, 32
+  asm vmovdqu ymm0, [rsp]
+  asm add rsp, 32
+
+  asm pop r15
+  asm pop r14
+  asm pop r13
+  asm pop r12
+  asm pop r11
+  asm pop r10
+  asm pop r9
+  asm pop r8
+
+  asm pop rdi
+  asm pop rsi
+  asm pop rbp
+  asm pop rbx
+  asm pop rdx
+  asm pop rcx
+  asm pop rax
+end calminstruction
+
+
 calminstruction zero_init? ptr*,size*
   local var
 

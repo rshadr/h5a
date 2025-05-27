@@ -14,11 +14,12 @@ struct CharacterQueue
 ends
 
 struct DoctypeToken
-  name            rb sizeof.H5aString
-  public_id       rb sizeof.H5aString
-  system_id       rb sizeof.H5aString
-  have_public_id  db ?
-  have_system_id  db ?
+  name               rb sizeof.H5aString
+  public_id          rb sizeof.H5aString
+  system_id          rb sizeof.H5aString
+  have_public_id     db ?
+  have_system_id     db ?
+  force_quirks_flag  db ?
 ends
 
 struct H5aParser

@@ -5,6 +5,7 @@ build/
 *.core
 *.vgcore
 massif.out.*
+callgrind.out.*
 perf.*
 *.html
 gen/
