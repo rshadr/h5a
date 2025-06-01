@@ -29,25 +29,23 @@ h5aCreateParser:
   push rbp
   mov rbp, rsp
 
-  with_saved_regs rdi, rsi
-    mov rdi, rsi
+  with_saved_regs r12, r13
+    mov r12, rsi
+    mov r13, rdi
+
+    mov rdi, r12
     xor al,al
     mov rcx, sizeof.H5aParser
     rep stosb
-  end with_saved_regs
 
-  mov rax, qword [rdi + H5aParserCreateInfo.input_get_char]
-  mov qword [rsi + H5aParser.input_stream.get_char_cb], rax
-  mov rcx, qword [rdi + H5aParserCreateInfo.input_user_data]
-  mov qword [rsi + H5aParser.input_stream.user_data], rcx
-  mov rdx, qword [rdi + H5aParserCreateInfo.sink_vtable]
-  mov qword [rsi + H5aParser.sink.vtable], rdx
-  mov r11, qword [rdi + H5aParserCreateInfo.sink_user_data]
-  mov qword [rdi + H5aParser.sink.user_data], r11
-
-  with_saved_regs r12, r13
-    ;r13 for alignment
-    mov r12, rsi
+    mov rax, qword [r13 + H5aParserCreateInfo.input_get_char]
+    mov qword [r12 + H5aParser.input_stream.get_char_cb], rax
+    mov rcx, qword [r13 + H5aParserCreateInfo.input_user_data]
+    mov qword [r12 + H5aParser.input_stream.user_data], rcx
+    mov rdx, qword [r13 + H5aParserCreateInfo.sink_vtable]
+    mov qword [r12 + H5aParser.sink.vtable], rdx
+    mov r11, qword [r13 + H5aParserCreateInfo.sink_user_data]
+    mov qword [r12 + H5aParser.sink.user_data], r11
 
     lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
     call _CharacterQueueConstruct
@@ -60,6 +58,15 @@ h5aCreateParser:
     call _h5aStringCreate
     lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.system_id]
     call _h5aStringCreate
+
+    lea rdi, [r12 + H5aParser.tokenizer.comment]
+    call _h5aStringCreate
+
+    lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
+    call _h5aStringCreate
+
+    ; XXX: attributes
+
   end with_saved_regs
 
   ;mov qword [rsi + H5aParser.tokenizer.state], DATA_STATE
@@ -86,6 +93,13 @@ h5aDestroyParser:
     call _h5aStringDestroy
     lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.system_id]
     call _h5aStringDestroy
+
+    lea rdi, [r12 + H5aParser.tokenizer.comment]
+    call _h5aStringDestroy
+
+    lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
+    call _h5aStringDestroy
+
   end with_saved_regs
 
   mov eax, H5A_SUCCESS

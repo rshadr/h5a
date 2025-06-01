@@ -212,7 +212,7 @@ typedef struct H5aHandle_s {
 } H5aHandle;
 
 typedef struct H5aStringView_s {
-  uint8_t const *data;
+  char const *data;
   size_t size;
 } H5aStringView;
 
@@ -221,8 +221,15 @@ typedef struct H5aStringView_s {
  * Handing in the handle like this is slightly
  * more efficient and costs nothing in maintenance/readability.
  */
+typedef union H5aHandleOrStringView_s {
+  H5aHandle handle;
+  H5aStringView view;
+} H5aHandleOrStringView;
+
 #define H5A_NODE_OR_TEXT_HANDLE(pref) \
-  H5aHandle pref, bool pref##_is_text
+  H5aHandleOrStringView pref, bool pref##_is_string
+
+#define H5A_SINK_CALLBACK_ATTR
 
 typedef struct H5aSinkVTable_s {
 

@@ -20,6 +20,19 @@ struct DoctypeToken
   have_public_id     db ?
   have_system_id     db ?
   force_quirks_flag  db ?
+  pad0               rb 5
+ends
+
+struct Attribute
+  name   rb sizeof.H5aString
+  value  rb sizeof.H5aString
+ends
+
+struct TagToken
+  name                            rb sizeof.H5aString
+  ; XXX: attributes
+  self_closing_flag               db ?
+  acknowledged_self_closing_flag  db ?
 ends
 
 struct H5aParser
@@ -31,13 +44,16 @@ struct H5aParser
   tokenizer.char_ref        dq ?
   tokenizer.input_buffer    rb sizeof.CharacterQueue
   tokenizer.temp_buffer     rb sizeof.CharacterQueue
+  tokenizer.comment         rb sizeof.H5aString
   tokenizer.doctype         rb sizeof.DoctypeToken
+  tokenizer.tag             rb sizeof.TagToken
   tokenizer.newline_count   dw ?
 
   tokenizer.state           db ?
   tokenizer.return_state    db ?
   treebuilder.mode          db ?
   treebuilder.original_mode db ?
+  tokenizer.tag_type        db ?
 
   tokenizer.saw_cr          db ?
   tokenizer.saw_eof         db ?
@@ -229,5 +245,11 @@ enum
   H5A_SUCCESS = 0
   H5A_FAILURE = 1
   H5A_PAUSED  = 2
+end enum
+
+enum
+  H5A_QUIRKS_MODE_NO_QUIRKS = 0
+  H5A_QUIRKS_MODE_LIMITED_QUIRKS
+  H5A_QUIRKS_MODE_QUIRKS
 end enum
 

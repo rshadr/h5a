@@ -40,6 +40,9 @@ typedef struct MdControlBlock_s {
   uint32_t _pad0;
 } MdControlBlock;
 
+#define MD_ALLOC(t_base) \
+  mdInstanceAllocate(sizeof(Md##t_base), md##t_base##_dtor)
+
 typedef enum MdNodeType_e {
   MD_NODETYPE_DOCTYPE,
   MD_NODETYPE_DOCUMENT,
@@ -138,21 +141,13 @@ static char32_t mdInputStreamGetChar (void *user_data);
 [[nodiscard]] static inline MdHandle mdHandleClone (MdHandle handle);
 static void mdHandleDestroy (MdHandle handle);
 
+[[nodiscard]] static MdHandle mdInstanceAllocate (size_t size, void (*dtor) (void *));
+
 static void mdHandleVectorCreate (MdHandleVector *vec);
 static void mdHandleVectorDestroy (MdHandleVector *vec);
 
-#if 0
-static void mdNode_ctor (void *user_data);
-static void mdNode_dtor (void *user_data);
-static void mdDoctype_ctor (void *user_data);
-static void mdDoctype_dtor (void *user_data);
-static void mdDocument_ctor (void *user_data);
-static void mdDocument_dtor (void *user_data);
-static void mdElement_ctor (void *user_data);
-static void mdElement_dtor (void *user_data);
-static void mdAttribute_ctor (void *user_data);
-static void mdAttribute_dtor (void *user_data);
-#endif
+static void mdSinkCreate (MdSink *sink);
+static void mdSinkDestroy (MdSink *sink);
 
 static void *mdSinkFinish (H5aSink *self);
 static void mdSinkParseError (H5aSink *self, char const *msg);
@@ -323,6 +318,23 @@ mdHandleDestroy (MdHandle handle)
 }
 
 
+[[nodiscard]]
+static MdHandle
+mdInstanceAllocate (size_t size, void (*dtor) (void *user_data))
+{
+  MdControlBlock *control_block = calloc(1, sizeof(*control_block) + size);
+  void *instance = (void *)((uintptr_t)(control_block) + sizeof(*control_block));
+
+  control_block->dtor = dtor;
+  control_block->ref_count = 1;
+
+  return (MdHandle) {
+    .control_block = control_block,
+    .instance = instance,
+  };
+}
+
+
 static void
 mdHandleVectorCreate (MdHandleVector *vec)
 {
@@ -330,6 +342,18 @@ mdHandleVectorCreate (MdHandleVector *vec)
   vec->data = calloc(init_capacity, sizeof(vec->data[0]));
   vec->capacity = init_capacity;
   vec->size = 0;
+}
+
+
+static void
+mdHandleVectorDestroy (MdHandleVector *vec)
+{
+  for (size_t i = 0; i < vec->size; ++i)
+    mdHandleDestroy(vec->data[i]);
+  free(vec->data);
+  vec->data = NULL;
+  vec->size = 0;
+  vec->capacity = 0;
 }
 
 
@@ -363,15 +387,88 @@ mdHandleVectorPop (MdHandleVector *vec)
 
 
 static void
-mdHandleVectorDestroy (MdHandleVector *vec)
+mdNode_ctor (MdNode *node, MdNodeType node_type)
 {
-  for (size_t i = 0; i < vec->size; ++i)
-    mdHandleDestroy(vec->data[i]);
-  free(vec->data);
-  vec->data = NULL;
-  vec->size = 0;
-  vec->capacity = 0;
+  node->node_type = node_type;
+  mdHandleVectorCreate(&node->child_nodes);
 }
+
+static void
+mdNode_dtor (void *user_data)
+{
+  MdNode *node = user_data;
+  mdHandleVectorDestroy(&node->child_nodes);
+}
+
+
+static void
+mdDoctype_ctor (MdDoctype *doctype,
+								H5aStringView name,
+								H5aStringView public_id,
+								H5aStringView system_id)
+{
+	mdNode_ctor((MdNode *)(doctype), MD_NODETYPE_DOCTYPE);
+
+	/* name shouldn't be null? */
+	doctype->name = strndup(name.data, name.size);
+
+	if (public_id.data != NULL)
+		doctype->public_id = strndup(public_id.data, public_id.size);
+
+	if (system_id.data != NULL)
+		doctype->system_id = strndup(system_id.data, system_id.size);
+}
+
+
+static void
+mdDoctype_dtor (void *user_data)
+{
+	MdDoctype *doctype = user_data;
+
+	if (doctype->name != NULL)
+		free(doctype->name);
+
+	if (doctype->public_id != NULL)
+		free(doctype->public_id);
+
+	if (doctype->system_id != NULL)
+		free(doctype->system_id);
+
+  mdNode_dtor(user_data);
+}
+
+
+static void
+mdDocument_ctor (MdDocument *document)
+{
+  mdNode_ctor((MdNode *)(document), MD_NODETYPE_DOCUMENT);
+
+  document->quirks_mode = H5A_QUIRKS_MODE_NO_QUIRKS;
+}
+
+static void
+mdDocument_dtor (void *user_data)
+{
+  // MdDocument *document = user_data;
+
+  mdNode_dtor(user_data);
+}
+
+
+static void
+mdSinkCreate (MdSink *sink)
+{
+  sink->document = MD_ALLOC(Document);
+  mdDocument_ctor(sink->document.instance);
+}
+
+
+static void
+mdSinkDestroy (MdSink *sink)
+{
+  mdHandleDestroy(sink->document);
+}
+
 
 static void *
 mdSinkFinish (H5aSink *self)
@@ -395,7 +492,7 @@ static H5aHandle
 mdSinkGetDocument (H5aSink *self)
 {
   MdSink *sink = (MdSink *)(self);
-  return mdMdHandleToH5a(sink->document);
+  return mdMdHandleToH5a( mdHandleClone(sink->document) );
 }
 
 
@@ -438,22 +535,33 @@ mdSinkAppend (H5aSink *self, H5aHandle parent, H5A_NODE_OR_TEXT_HANDLE(child))
   (void) self;
   (void) parent;
   (void) child;
-  (void) child_is_text;
+  (void) child_is_string;
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 static void
 mdSinkAppendDoctypeToDocument (H5aSink *self, 
                                H5aStringView name,
                                H5aStringView public_id,
                                H5aStringView system_id)
 {
-  (void) self;
-  (void) name;
-  (void) public_id;
-  (void) system_id;
+	MdSink *sink = (MdSink *)(self);
+  printf("name (%zu bytes): %s\n", name.size, name.data);
+  printf("public_id (%zu bytes): %s\n", public_id.size, public_id.data);
+  printf("system_id (%zu bytes): %s\n", system_id.size, system_id.data);
 
-  printf("doctype name: %s\n", name.data);
+	auto document_handle = mdHandleClone(sink->document);
+	auto document = (MdDocument *)(document_handle.instance);
+
+	auto doctype_handle = MD_ALLOC(Doctype);
+  mdDoctype_ctor((MdDoctype *)(doctype_handle.instance),
+    name, public_id, system_id);
+
+	mdHandleVectorPush(&((MdNode *)document)->child_nodes, doctype_handle);
+
+	mdHandleDestroy(doctype_handle);
+	mdHandleDestroy(document_handle);
 }
 
 
@@ -505,6 +613,7 @@ main (int argc, char *argv[])
   H5aParser *parser = (H5aParser *)(parser_mem);
 
   MdSink sink = { 0 };
+  mdSinkCreate(&sink);
 
   mdInputStreamCreate(&stream, file_name);
 
@@ -520,6 +629,7 @@ main (int argc, char *argv[])
   h5aDestroyParser(parser);
 
   mdInputStreamDestroy(&stream);
+  mdSinkDestroy(&sink);
 
   return EXIT_SUCCESS;
 }

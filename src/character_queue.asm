@@ -12,9 +12,11 @@ format ELF64
 extrn calloc
 extrn reallocarray
 extrn free
+extrn memcpy
 
 public _CharacterQueueConstruct
 public _CharacterQueueDestroy
+public _CharacterQueueGrow
 public _CharacterQueuePushFront
 public _CharacterQueuePushBack
 public _CharacterQueuePopFront
@@ -64,11 +66,69 @@ _CharacterQueueDestroy:
 _CharacterQueueGrow:
   ;; RDI: _NonNull CharacterQueue *queue
   ;; -> void
-  push rbp
-  mov rbp, rsp
-  ;; XXX ...
-  unimplemented
-  leave
+  with_stack_frame
+  with_saved_regs rbx, r10, r13, r14
+    ; r10 scratch
+    mov r13, rdi ;queue struct
+    xor r14,r14 ;new_capacity
+    xor rbx,rbx ;new_items
+    
+    mov r14d, dword [r13 + CharacterQueue.capacity]
+    shl r14d, 1
+
+    xor rdi,rdi
+    mov dil, 1
+    xor rsi,rsi
+    mov rsi, r14
+    call calloc
+    mov rbx, rax
+
+    mov esi, dword [r13 + CharacterQueue.size]
+    test esi,esi
+    jz .simpleCase
+    mov eax, dword [r13 + CharacterQueue.front_idx]
+    mov ecx, dword [r13 + CharacterQueue.back_idx]
+    cmp eax, ecx
+    jl .simpleCase
+
+.complexCase:
+    xor r10,r10 ;offset_from_end
+    mov r10d, dword [r13 + CharacterQueue.capacity]
+    sub r10d, eax
+
+    ; step 1: copy back part to front
+    lea rdi, [rbx + 0]
+    mov rsi, qword [r13 + CharacterQueue.data]
+    lea rsi, [rsi + r10 * 4]
+    mov rdx, r10
+    call memcpy
+
+    ; step 2: copy front part to back
+    lea rdi, [rbx + r10 * 4]
+    mov rsi, qword [r13 + CharacterQueue.data]
+    xor rdx,rdx
+    mov edx, dword [r13 + CharacterQueue.size]
+    sub edx, r10d
+    call memcpy
+
+    jmp .finish
+
+.simpleCase:
+    mov rdi, rbx
+    mov rsi, qword [r13 + CharacterQueue.data]
+    xor rax,rax
+    mov eax, dword [r13 + CharacterQueue.capacity]
+    lea rdx, [rax * 4]
+    call memcpy
+    ;fallthrough
+.finish:
+  mov dword [r13 + CharacterQueue.capacity], r14d
+  mov rdi, qword [r13 + CharacterQueue.data]
+  call free
+  mov qword [r13 + CharacterQueue.data], rbx
+
+  end with_saved_regs
+  end with_stack_frame
   ret
 
 
@@ -80,7 +140,7 @@ _CharacterQueuePushFront:
   mov rbp, rsp
 
   mov ecx, dword [rdi + CharacterQueue.size]
-  cmp ecx, [rdi + CharacterQueue.capacity]
+  cmp ecx, dword [rdi + CharacterQueue.capacity]
   jl .noGrow
 
   with_saved_regs rdi, rsi
@@ -117,7 +177,7 @@ _CharacterQueuePushBack:
   mov rbp, rsp
 
   mov ecx, dword [rdi + CharacterQueue.size]
-  cmp ecx, [rdi + CharacterQueue.capacity]
+  cmp ecx, dword [rdi + CharacterQueue.capacity]
   jne .noGrow
 
   with_saved_regs rdi, rsi

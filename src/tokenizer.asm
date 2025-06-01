@@ -25,8 +25,14 @@ public _h5aTokenizerEat
 public _h5aTokenizerEatSensitive
 public _h5aTokenizerEatInsensitive
 public _h5aTokenizerCreateDoctype
+public _h5aTokenizerCreateComment
+public _h5aTokenizerCreateStartTag
+public _h5aTokenizerCreateEndTag
+public _h5aTokenizerStartAttribute
 public _h5aTokenizerEmitDoctype
+public _h5aTokenizerEmitComment
 public _h5aTokenizerEmitCharacter
+public _h5aTokenizerEmitTag
 public _h5aTokenizerEmitEof
 public _h5aTokenizerHaveAppropriateEndTag
 public _h5aTokenizerFlushEntityChars
@@ -184,8 +190,27 @@ _h5aTokenizerCreateDoctype:
   end with_stack_frame
   ret
 
+_h5aTokenizerCreateComment:
+;; R12 (s): H5aParser *parser
+  with_stack_frame
+    lea rdi, [r12 + H5aParser.tokenizer.comment]
+    call _h5aStringClear
+  end with_stack_frame
+  ret
+
 _h5aTokenizerCreateTag:
-  ; ...
+;; R12 (s): H5aParser *parser
+;; RDI (arg): H5aTokenType type
+;; -> void
+  with_stack_frame
+    mov byte [r12 + H5aParser.tokenizer.tag_type], dil
+    lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
+    call _h5aStringClear
+    ; XXX: clear attributes
+    xor al,al
+    mov byte [r12 + H5aParser.tokenizer.tag + TagToken.self_closing_flag], al
+    mov byte [r12 + H5aParser.tokenizer.tag + TagToken.acknowledged_self_closing_flag], al
+  end with_stack_frame
   ret
 
 _h5aTokenizerCreateStartTag:
@@ -197,6 +222,10 @@ _h5aTokenizerCreateEndTag:
   xor rdi,rdi
   mov dil, TOKEN_END_TAG
   jmp _h5aTokenizerCreateTag
+
+_h5aTokenizerStartAttribute:
+; XXX ...
+  ret
 
 public _h5aTokenizerEmitToken
 _h5aTokenizerEmitToken:
@@ -211,10 +240,18 @@ _h5aTokenizerEmitToken:
 
 
 _h5aTokenizerEmitDoctype:
-;; R12 (s); H5aParser *parser
+;; R12 (s): H5aParser *parser
   lea rdi, [r12 + H5aParser.tokenizer.doctype]
   xor rsi,rsi
   mov sil, TOKEN_DOCTYPE
+  jmp _h5aTokenizerEmitToken
+
+
+_h5aTokenizerEmitComment:
+;; R12 (s): H5aParser *parser
+  lea rdi, [r12 + H5aParser.tokenizer.comment]
+  xor rsi,rsi
+  mov sil, TOKEN_COMMENT
   jmp _h5aTokenizerEmitToken
 
 
@@ -239,6 +276,15 @@ _h5aTokenizerEmitCharacter:
 
 .yes:
   mov sil, TOKEN_WHITESPACE
+  jmp _h5aTokenizerEmitToken
+
+
+_h5aTokenizerEmitTag:
+;; R12 (s): H5aParser *parser
+;; -> void
+  lea rdi, [r12 + H5aParser.tokenizer.tag]
+  ; XXX
+  ;movzx rsi, byte [r12 + H5aParser.tokeniz
   jmp _h5aTokenizerEmitToken
 
 

@@ -253,6 +253,8 @@ macro mode? name*,index_name*
   no_pending:
 
     ;; Commands
+    match =parse_error=!, line
+    jyes cmd_parse_error
     match =goto=! =anything_else, line
     jyes goto_always
     match =process_using_rules=! redir_mode, line
@@ -445,6 +447,10 @@ macro mode? name*,index_name*
     jyes any_already_seen
 
     arrange any_seen, 1
+    arrange var, =public prefix.=anythingElse
+    assemble var
+    arrange var, =label prefix.=anythingElse
+    assemble var
     arrange var, =public type_next_label
     assemble var
     arrange var, =label type_next_label
@@ -483,12 +489,18 @@ macro mode? name*,index_name*
     exit
 
 
-  goto_always:
+  cmd_parse_error:
     ; ...
     exit
 
+
+  goto_always:
+    arrange var, =jmp prefix.=anythingElse
+    assemble var
+    exit
+
   process_using_rules:
-    ; ...
+    ; XXX: improve
     asm lea rcx, [_k_h5a_TreeBuilder_handlerTable]
     arrange var, =jmp =qword [=rcx + (redir_mode * 8)]
     assemble var

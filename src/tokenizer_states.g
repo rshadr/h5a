@@ -148,6 +148,8 @@ macro state? name*,index_name*
     jyes goto_always
     match =goto_if?! cond =anything_else?, line
     jyes goto_if
+    match =token_error?! code, line
+    jyes cmd_token_error
 
     ;fallthrough
     unknown:
@@ -275,6 +277,9 @@ macro state? name*,index_name*
     goto_if:
       arrange var, =j#cond prefix.=any
       assemble var
+      exit
+
+    cmd_token_error:
       exit
 
     finish:

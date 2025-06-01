@@ -20,8 +20,7 @@ public _k_h5a_impliedTagsExt
 public _k_h5a_impliedTagsBasic.size
 public _k_h5a_impliedTagsExt.size
 
-public _h5aTreeBuilderInsertCommentExplicit
-public _h5aTreeBuilderInsertComment
+public _h5aTreeBuilderAppendCommentToDocument
 public _h5aTreeBuilderInsertCharacterBuffer
 public _h5aTreeBuilderInsertCharacter
 public _h5aTreeBuilderGenerateImpliedEndTags
@@ -31,21 +30,52 @@ public _h5aTreeBuilderAcceptToken
 
 section '.text' executable
 
-_h5aTreeBuilderInsertCommentExplicit:
+_h5aTreeBuilderAppendCommentToDocument:
 ;; R12 (s): H5aParser *parser
-;; RDI: Comment *comment
-;; XXX: pos
+;; R15 (s): H5aSinkVTable *sink_vtable
+;; RDI (arg): H5aString *comment
 ;; -> void
   with_stack_frame
+
+    mov rcx, rdi
+    mov rsi, qword [rcx + H5aString.data]
+    xor rdx,rdx
+    mov edx, dword [rcx + H5aString.size]
+    mov rdi, qword [r12 + H5aParser.sink.user_data]
+    call qword [r15 + H5aSinkVTable.create_comment]
+    push rax
+    push rdx
+
+    mov rdi, qword [r12 + H5aParser.sink.user_data]
+    call qword [r15 + H5aSinkVTable.get_document]
+    push rax
+    push rdx
+
+    ; document handle
+    mov rsi, qword [rbp - 2 * 8]
+    mov rdx, qword [rbp - 3 * 8]
+    ; child (comment) handle
+    mov rcx, qword [rbp - 0 * 8]
+    mov r8,  qword [rbp - 1 * 8]
+    xor r9,r9
+
+    mov rdi, qword [r12 + H5aParser.sink.user_data]
+    call qword [r15 + H5aSinkVTable.append]
+
+
+    ;; destroy handles
+    mov rsi, qword [rbp - 2 * 8]
+    mov rdx, qword [rbp - 3 * 8]
+    mov rdi, qword [r12 + H5aParser.sink.user_data]
+    call qword [r15 + H5aSinkVTable.destroy_handle]
+
+    mov rsi, qword [rbp - 0 * 8]
+    mov rdx, qword [rbp - 1 * 8]
+    mov rdi, qword [r12 + H5aParser.sink.user_data]
+    call qword [r15 + H5aSinkVTable.destroy_handle]
+
   end with_stack_frame
   ret
-
-_h5aTreeBuilderInsertComment:
-;; R12 (s); H5aParser *parser
-;; RDI: Comment *comment
-;; -> void
-  ; XXX: fill regs
-  jmp _h5aTreeBuilderInsertCommentExplicit
 
 _h5aTreeBuilderGenericCommonParse:
 ;; -> void

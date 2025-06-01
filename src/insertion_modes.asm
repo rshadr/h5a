@@ -11,6 +11,8 @@ include "insertion_modes.g"
 
 format ELF64
 
+extrn _h5aTreeBuilderAppendCommentToDocument
+
 public _k_h5a_TreeBuilder_handlerTable
 
 section '.text'
@@ -26,12 +28,12 @@ _h5aTreeBuilderHandler.DUMMY.eof:
 
 quirksCheck:
   ; ...
-  xor al,al
+  xor rax,rax
   ret
 
 limitedQuirksCheck:
   ; ...
-  xor al,al
+  xor rax,rax
   ret
 
 
@@ -42,13 +44,15 @@ mode initial,INITIAL_MODE
     ret
 
   [[Comment]]
-    ; ...
+    with_stack_frame
+      call _h5aTreeBuilderAppendCommentToDocument
+    end with_stack_frame
     xor al,al
     ret
 
   [[DOCTYPE]]
-public the_razor
-label the_razor
+;public the_razor
+;label the_razor
 
     namespace initial_doctype
       with_stack_frame
@@ -63,6 +67,8 @@ label the_razor
 .action1:
         ; XXX: parse error
 .action2:
+public razor
+label razor
         mov rdi, qword [r12 + H5aParser.sink.user_data]
 
         mov rsi, qword [r13 + DoctypeToken.name + H5aString.data]
@@ -82,25 +88,48 @@ label the_razor
         test al,al
         cmovnz r8, qword [r13 + DoctypeToken.system_id + H5aString.data]
         cmovnz r11d, dword [r13 + DoctypeToken.system_id + H5aString.size]
-        sub rsp, 8
+        xor rax,rax
+        push rax
         push r11
   
         call qword [r15 + H5aSinkVTable.append_doctype_to_document]
 
 .check3:
-        ; ...
-        mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HTML_MODE
+        call quirksCheck
+        test al,al
+        jz .check4
+.action3:
+        mov rdi, qword [r12 + H5aParser.sink.user_data]
+        xor rsi,rsi
+        mov sil, H5A_QUIRKS_MODE_QUIRKS
+        call qword [r15 + H5aSinkVTable.set_quirks_mode]
+        jmp .finish
+
+.check4:
+        call limitedQuirksCheck
+        test al,al
+        jz .finish
+.action4:
+        mov rdi, qword [r12 + H5aParser.sink.user_data]
+        xor rsi,rsi
+        mov sil, H5A_QUIRKS_MODE_LIMITED_QUIRKS
+        call qword [r12 + H5aSinkVTable.set_quirks_mode]
 .finish:
+        mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HTML_MODE
       end with_stack_frame
       xor al,al
       ret
     end namespace
 
   [[Anything else]]
-    ; ...
-    mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HTML_MODE
-    mov al, RESULT_REPROCESS
-    ret
+    namespace initial.anythingElse
+      with_stack_frame
+        ; ...
+        mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HTML_MODE
+      end with_stack_frame
+      mov al, RESULT_REPROCESS
+      ret
+    end namespace
 
 end mode
 
@@ -108,12 +137,16 @@ end mode
 mode beforeHtml,BEFORE_HTML_MODE
 
   [[DOCTYPE]]
-    ; ...
+    with_stack_frame
+      parse_error!
+    end with_stack_frame
     mov al, RESULT_IGNORE
     ret
 
   [[Comment]]
-    ; ...
+    with_stack_frame
+      call _h5aTreeBuilderAppendCommentToDocument
+    end with_stack_frame
     xor al,al
     ret
 
@@ -136,13 +169,17 @@ mode beforeHtml,BEFORE_HTML_MODE
     goto! anything_else
 
   [[Any other end tag]]
-    ; ...
+    with_stack_frame
+      ; ...
+    end with_stack_frame
     mov al, RESULT_IGNORE
     ret
 
   [[Anything else]]
-    ; ...
-    mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HEAD_MODE
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HEAD_MODE
+    end with_stack_frame
     mov al, RESULT_REPROCESS
     ret
 
