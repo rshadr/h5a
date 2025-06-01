@@ -28,7 +28,10 @@ extrn _h5aTokenizerEmitTag
 extrn _h5aTokenizerEmitEof
 extrn _h5aTokenizerHaveAppropriateEndTag
 extrn _h5aTokenizerFlushEntityChars
-extrn _CharacterQueuePushFront
+extrn _h5aCharacterQueuePushFront
+extrn _h5aCharacterQueuePushBack
+extrn _h5aCharacterQueueSubscript
+extrn _h5aCharacterQueueClear
 extrn unicodeIsSurrogate
 extrn unicodeIsNonCharacter
 
@@ -69,19 +72,18 @@ state data,DATA_STATE
       token_error! unexpected_null_error
       mov rdi, r13
       call _h5aTokenizerEmitCharacter
-      xor al,al
     end with_stack_frame
+    xor al,al
     ret
 
   [[EOF]]
-    xor al,al
-    ret
+    jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
     with_stack_frame
       call _h5aTokenizerEmitCharacter
-      xor al,al
     end with_stack_frame
+    xor al,al
     ret
 
 end state
@@ -137,8 +139,8 @@ state rawtext,RAWTEXT_STATE
       xor edi,edi
       mov di, 0xFFFD
       call _h5aTokenizerEmitCharacter
-      xor al,al
     end with_stack_frame
+    xor al,al
     ret
 
   [[EOF]]
@@ -461,6 +463,10 @@ state rcdataEndTagName,RCDATA_END_TAG_NAME_STATE
       add sil, 0x20
       lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
       call _h5aStringPushBackAscii
+
+      lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
+      mov rsi, r13
+      call _h5aCharacterQueuePushBack
     end with_stack_frame
     xor al,al
     ret
@@ -470,23 +476,44 @@ state rcdataEndTagName,RCDATA_END_TAG_NAME_STATE
       mov rsi, r13
       lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
       call _h5aStringPushBackAscii
+
+      lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
+      mov rsi, r13
+      call _h5aCharacterQueuePushBack
     end with_stack_frame
     xor al,al
     ret
 
   [[Anything else]]
+namespace rcdataEndTagName_anythingElse
     with_stack_frame
+      iterate cp, '<', '/'
+        xor rdi,rdi
+        mov dil, cp
+        call _h5aTokenizerEmitCharacter
+      end iterate
+
+.temp_buffer_loop:
+      mov eax, dword [r12 + H5aParser.tokenizer.temp_buffer + H5aCharacterQueue.size]
+      test eax,eax
+      jz .temp_buffer_loop.post
+
+      lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
+      xor rsi,rsi
+      call _h5aCharacterQueueSubscript
+
       xor rdi,rdi
-      mov dil, '<'
+      mov edi, dword [rax]
       call _h5aTokenizerEmitCharacter
-      xor rdi,rdi
-      mov dil, '/'
-      call _h5aTokenizerEmitCharacter
-      ; ...
+
+      jmp .temp_buffer_loop
+
       mov byte [r12 + H5aParser.tokenizer.state], RCDATA_STATE
+.temp_buffer_loop.post:
     end with_stack_frame
     mov al, RESULT_RECONSUME
     ret
+end namespace
 
 end state
 
@@ -604,12 +631,11 @@ state rawtextEndTagName,RAWTEXT_END_TAG_NAME_STATE
 
   [[Anything else]]
     with_stack_frame
-      xor rdi,rdi
-      mov dil, '<'
-      call _h5aTokenizerEmitCharacter
-      xor rdi,rdi
-      mov dil, '/'
-      call _h5aTokenizerEmitCharacter
+      iterate cp, '<','/'
+        xor rdi,rdi
+        mov dil, cp
+        call _h5aTokenizerEmitCharacter
+      end iterate
       ; ...
     end with_stack_frame
     mov byte [r12 + H5aParser.tokenizer.state], RAWTEXT_STATE
@@ -2373,7 +2399,16 @@ end state
 ;; ...
 
 state characterReference,CHARACTER_REFERENCE_STATE
-  ;; clear tmpbuf
+
+  @SpecialAction
+  with_stack_frame
+    lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
+    call _h5aCharacterQueueClear
+    lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
+    xor rsi,rsi
+    mov sil, '&'
+    call _h5aCharacterQueuePushBack
+  end with_stack_frame
 
   [[ASCII alphanumeric]]
     with_stack_frame
@@ -2383,12 +2418,12 @@ state characterReference,CHARACTER_REFERENCE_STATE
       ;; "lt;" instead of ("l" THEN "t;") or "&lt;"
       mov rsi, rdi
       lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
-      call _CharacterQueuePushFront
+      call _h5aCharacterQueuePushFront
       mov byte [r12 + H5aParser.tokenizer.state], NAMED_CHARACTER_REFERENCE_STATE
 
       ;mov al, RESULT_RECONSUME
-      xor al,al
     end with_stack_frame
+    xor al,al
     ret
 
   [[U+0023 NUMBER SIGN]]
@@ -2464,6 +2499,10 @@ end state
 ;; ...
 
 state numericCharacterReference,NUMERIC_CHARACTER_REFERENCE_STATE
+
+  @SpecialAction
+  xor rax,rax
+  mov qword [r12 + H5aParser.tokenizer.char_ref], rax
 
   [[U+0078 LATIN SMALL LETTER X]]
   [[U+0058 LATIN CAPITAL LETTER X]]

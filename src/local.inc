@@ -5,7 +5,7 @@ struct H5aString
   capacity dd ?
 ends
 
-struct CharacterQueue
+struct H5aCharacterQueue
   data dq ?
   size dd ?
   capacity dd ?
@@ -42,8 +42,8 @@ struct H5aParser
   sink.user_data            dq ?
 
   tokenizer.char_ref        dq ?
-  tokenizer.input_buffer    rb sizeof.CharacterQueue
-  tokenizer.temp_buffer     rb sizeof.CharacterQueue
+  tokenizer.input_buffer    rb sizeof.H5aCharacterQueue
+  tokenizer.temp_buffer     rb sizeof.H5aCharacterQueue
   tokenizer.comment         rb sizeof.H5aString
   tokenizer.doctype         rb sizeof.DoctypeToken
   tokenizer.tag             rb sizeof.TagToken

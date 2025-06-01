@@ -38,6 +38,7 @@ build/treebuilder.o: src/treebuilder.asm \
 	src/local.inc src/util.inc
 
 TESTS =\
+	character_queue\
 	string
 
 TEST_BINS = $(patsubst %, build/test/%, $(TESTS))

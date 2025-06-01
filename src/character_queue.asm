@@ -2,6 +2,17 @@
 ;;;; Copyright 2025 rshadr
 ;;;; See LICENSE for details
 ;;;;
+;;;; The `H5aCharacterQueue` class is used by the tokenizer for input buffering
+;;;;
+;;;; It is very similar to the `std::deque` container from C++ with some
+;;;; notable adaptations:
+;;;;
+;;;; - Pushing can be done from the front and the back
+;;;; - Can only pop from the front
+;;;; - Subscripting (C++: operator[]) does not create missing entries and
+;;;;    returns a pointer
+;;;; - Its capacity is always a power of 2, hence the recurring "dec/and" idiom
+;;;;
 
 include 'macro/struct.inc'
 include "util.inc"
@@ -14,277 +25,271 @@ extrn reallocarray
 extrn free
 extrn memcpy
 
-public _CharacterQueueConstruct
-public _CharacterQueueDestroy
-public _CharacterQueueGrow
-public _CharacterQueuePushFront
-public _CharacterQueuePushBack
-public _CharacterQueuePopFront
-public _CharacterQueueSubscript
 
 section '.rodata'
-_CharacterQueue_init_capacity:
+_h5aCharacterQueue_init_capacity:
   dd 16
+
 
 section '.text' executable
 
-_CharacterQueueConstruct:
-;; RDI: CharacterQueue *queue
+func _h5aCharacterQueueConstruct, public
+;; RDI: H5aCharacterQueue *queue
   with_saved_regs rbx
     mov rbx, rdi
-    zero_init rdi, sizeof.CharacterQueue
+
+    ; mov rdi, rbx
+    zero_init rdi, sizeof.H5aCharacterQueue
 
     xor rdi,rdi
-    mov dil, 8
-    mov rsi,rsi
-    mov esi, dword [_CharacterQueue_init_capacity]
+    mov edi, dword [_h5aCharacterQueue_init_capacity]
+    xor rsi,rsi
+    mov sil, 4
     call calloc
     ; XXX: check
+    mov qword [rbx + H5aCharacterQueue.data], rax
 
-    mov qword [rbx + CharacterQueue.data], rax
-    mov ecx, dword [_CharacterQueue_init_capacity]
-    mov dword [rbx + CharacterQueue.capacity], ecx
-    ; XXX: indices?
-    
+    mov edx, dword [_h5aCharacterQueue_init_capacity]
+    mov dword [rbx + H5aCharacterQueue.capacity], edx
   end with_saved_regs
   ret
+end func
 
-_CharacterQueueDestroy:
-  push rbp
-  mov rbp, rsp
 
-  with_saved_regs rdi
-    mov rdi, [rdi + CharacterQueue.data]
+func _h5aCharacterQueueDestroy, public
+;; RDI: H5aCharacterQueue *queue
+;; -> void
+  with_saved_regs rbx
+    mov rbx, rdi
+
+    mov rdi, qword [rbx + H5aCharacterQueue.data]
     call free
+
+    zero_init rbx, sizeof.H5aCharacterQueue
   end with_saved_regs
-
-  ;zero_init rdi, sizeof.CharacterQueue
-
-  leave
   ret
+end func
 
-_CharacterQueueGrow:
-  ;; RDI: _NonNull CharacterQueue *queue
-  ;; -> void
-  with_stack_frame
-  with_saved_regs rbx, r10, r13, r14
-    ; r10 scratch
-    mov r13, rdi ;queue struct
-    xor r14,r14 ;new_capacity
-    xor rbx,rbx ;new_items
-    
-    mov r14d, dword [r13 + CharacterQueue.capacity]
-    shl r14d, 1
 
-    xor rdi,rdi
-    mov dil, 1
+func _h5aCharacterQueueGrow, public
+;; RDI: H5aCharacterQueue *queue
+;; -> void
+;;
+;; DESCRIPTION:
+;;   Doubles the capacity of `queue` and rearranges contents into a continuous
+;;   block
+
+  with_saved_regs rbx, r10, r13, r14, r15
+    mov rbx, rdi ;queue struct
+    xor r13,r13
+    mov r13d, dword [rbx + H5aCharacterQueue.capacity]
+    shl r13d, 1 ;new_capacity
+
+    mov rdi, r13
     xor rsi,rsi
-    mov rsi, r14
+    mov sil, 4
     call calloc
-    mov rbx, rax
+    mov r10, rax ;new_data
 
-    mov esi, dword [r13 + CharacterQueue.size]
-    test esi,esi
-    jz .simpleCase
-    mov eax, dword [r13 + CharacterQueue.front_idx]
-    mov ecx, dword [r13 + CharacterQueue.back_idx]
-    cmp eax, ecx
-    jl .simpleCase
+    ;; step 0: compute offsets
+    xor r14,r14
+    xor r15,r15
+    mov r14d, dword [rbx + H5aCharacterQueue.capacity]
+    mov r15d, dword [rbx + H5aCharacterQueue.front_idx]
+    mov ecx, dword [rbx + H5aCharacterQueue.back_idx]
+    cmp r14d, ecx
+    cmovbe r14d, ecx
+    sub r14d, r15d ;old_capacity - front_idx
 
-.complexCase:
-    xor r10,r10 ;offset_from_end
-    mov r10d, dword [r13 + CharacterQueue.capacity]
-    sub r10d, eax
+    ;; step 1: store back irrelevant data
+    mov dword [rbx + H5aCharacterQueue.capacity], r13d
+    mov r13, r10 ;new_data persists now
 
-    ; step 1: copy back part to front
-    lea rdi, [rbx + 0]
-    mov rsi, qword [r13 + CharacterQueue.data]
-    lea rsi, [rsi + r10 * 4]
-    mov rdx, r10
+    ;; step 2: bring primary slice forward
+    lea rdi, [r13 + 0]
+    mov rsi, qword [rbx + H5aCharacterQueue.data]
+    lea rsi, [rsi + r15 * 4]
+    mov rdx, r14
+    shl rdx, 2
     call memcpy
 
-    ; step 2: copy front part to back
-    lea rdi, [rbx + r10 * 4]
-    mov rsi, qword [r13 + CharacterQueue.data]
+    ;; step 3: bring secondary slice backward
+    lea rdi, [r13 + r14 * 4]
+    mov rsi, qword [rbx + H5aCharacterQueue.data]
+    lea rsi, [rsi + 0]
     xor rdx,rdx
-    mov edx, dword [r13 + CharacterQueue.size]
-    sub edx, r10d
+    mov edx, dword [rbx + H5aCharacterQueue.back_idx]
+    shl rdx, 2
     call memcpy
 
-    jmp .finish
+    ;; step 4: cleanup
+    mov rdi, qword [rbx + H5aCharacterQueue.data]
+    call free
+    mov qword [rbx + H5aCharacterQueue.data], r13
 
-.simpleCase:
+    xor eax,eax
+    mov dword [rbx + H5aCharacterQueue.front_idx], eax
+
+    mov ecx, dword [rbx + H5aCharacterQueue.size]
+    mov dword [rbx + H5aCharacterQueue.back_idx], ecx
+
+  end with_saved_regs
+  ret
+end func
+
+
+func _h5aCharacterQueuePushBack, public
+;; RDI: H5aCharacterQueue *queue
+;; RSI: char32_t c
+;; -> RAX: char32_t c
+  with_saved_regs rbx, r13, r14
+    mov rbx, rdi ;queue
+    xor r13,r13  ;capacity
+    mov r14, rsi ;c
+
+    mov ecx, dword [rbx + H5aCharacterQueue.size]
+    cmp ecx, dword [rbx + H5aCharacterQueue.capacity]
+    jb .noGrow
+
     mov rdi, rbx
-    mov rsi, qword [r13 + CharacterQueue.data]
+    call _h5aCharacterQueueGrow
+
+.noGrow:
+    xor rdx,rdx
+    mov edx, dword [rbx + H5aCharacterQueue.back_idx]
+    mov rdi, qword [rbx + H5aCharacterQueue.data]
+    mov dword [rdi + rdx * 4], r14d
+
+    mov r13d, dword [rbx + H5aCharacterQueue.capacity]
+    dec r13d ;2-adic mask
+    inc edx
+    and edx, r13d
+    mov dword [rbx + H5aCharacterQueue.back_idx], edx
+
+    inc dword [rbx + H5aCharacterQueue.size]
+
+    mov rax, r14
+  end with_saved_regs
+  ret
+end func
+
+
+func _h5aCharacterQueuePushFront, public
+;; RDI: H5aCharacterQueue *queue
+;; RSI: char32_t c
+;; -> RAX: char32_t c
+  with_saved_regs rbx, r13, r14
+    mov rbx, rdi ;queue
+    xor r13,r13  ;capacity
+    mov r14, rsi ;c
+
+    mov ecx, dword [rbx + H5aCharacterQueue.size]
+    cmp ecx, dword [rbx + H5aCharacterQueue.capacity]
+    jb .noGrow
+
+    mov rdi, rbx
+    call _h5aCharacterQueueGrow
+
+.noGrow:
+    xor rdx,rdx
+    mov edx, dword [rbx + H5aCharacterQueue.front_idx]
+    dec edx
+    mov esi, dword [rbx + H5aCharacterQueue.capacity]
+    dec esi ;2-adic mask
+    and edx, esi
+
+    mov rdi, qword [rbx + H5aCharacterQueue.data]
+    mov dword [rdi + rdx * 4], r14d
+
+    inc dword [rbx + H5aCharacterQueue.size]
+
+    mov rax, r14
+  end with_saved_regs
+  ret
+end func
+
+
+func _h5aCharacterQueuePopFront, public
+;; RDI: H5aCharacterQueue *queue
+;; -> RAX: char32_t c
+;; -> RDX: bool was_popped
+  with_saved_regs rbx
+    mov rbx, rdi ;queue
     xor rax,rax
-    mov eax, dword [r13 + CharacterQueue.capacity]
-    lea rdx, [rax * 4]
-    call memcpy
-    ;fallthrough
+    xor rdx,rdx
+
+    mov eax, dword [rbx + H5aCharacterQueue.size]
+    test eax,eax
+    jz .finish
+
+    mov rdi, qword [rbx + H5aCharacterQueue.data]
+    mov ecx, dword [rbx + H5aCharacterQueue.front_idx]
+    mov eax, dword [rdi + rcx * 4]
+
+    mov esi, dword [rbx + H5aCharacterQueue.capacity]
+    dec esi ;2-adic mask
+    inc ecx
+    and ecx, esi
+    mov dword [rbx + H5aCharacterQueue.front_idx], ecx
+
+    dec dword [rbx + H5aCharacterQueue.size]
+
+    mov dl, 1
+
 .finish:
-  mov dword [r13 + CharacterQueue.capacity], r14d
-  mov rdi, qword [r13 + CharacterQueue.data]
-  call free
-  mov qword [r13 + CharacterQueue.data], rbx
-
   end with_saved_regs
-  end with_stack_frame
   ret
+end func
 
 
-_CharacterQueuePushFront:
-;; RDI: _NonNull CharacterQueue *queue
-;; ESI: char32_t c
-;; -> EAX: char32_t c
-  push rbp
-  mov rbp, rsp
+func _h5aCharacterQueueSubscript, public
+;; RDI: H5aCharacterQueue *queue
+;; RSI: uint32_t index
+;; -> RAX: _Nullable char32_t *c
+  with_saved_regs rbx
+    mov rbx, rdi ;queue
+    xor rax,rax
 
-  mov ecx, dword [rdi + CharacterQueue.size]
-  cmp ecx, dword [rdi + CharacterQueue.capacity]
-  jl .noGrow
+    mov r8, qword [rbx + H5aCharacterQueue.data]
 
-  with_saved_regs rdi, rsi
-    call _CharacterQueueGrow
+    xor rcx,rcx
+    mov ecx, dword [rbx + H5aCharacterQueue.size]
+    cmp rsi, rcx
+    jae .finish
+
+    mov edx, dword [rbx + H5aCharacterQueue.capacity]
+    mov eax, dword [rdi + H5aCharacterQueue.front_idx]
+    sub edx, eax
+
+    cmp ecx, edx
+    jae .secondarySlice
+
+.primarySlice:
+  add esi, dword [rdi + H5aCharacterQueue.front_idx]
+.secondarySlice:
+  lea rax, [r8 + rsi * 4]
+
+.finish:
   end with_saved_regs
-
-.noGrow:
-  xor rcx,rcx
-  mov ecx, dword [rdi + CharacterQueue.front_idx]
-  mov rax, qword [rdi + CharacterQueue.data]
-
-  test ecx,ecx
-  jnz .inRange ;front_idx > 0
-
-  mov ecx, dword [rdi + CharacterQueue.capacity]
-.inRange:
-  dec ecx
-
-  mov dword [rax + rcx * 4], esi
-  mov dword [rdi + CharacterQueue.front_idx], ecx
-  inc dword [rdi + CharacterQueue.size]
-  xor rax,rax
-  mov eax,esi
-
-  leave
   ret
+end func
 
 
-_CharacterQueuePushBack:
-;; RDI: _NonNull CharacterQueue *queue
-;; ESI: char32_t c
-;; -> EAX: char32_t c
-  push rbp
-  mov rbp, rsp
-
-  mov ecx, dword [rdi + CharacterQueue.size]
-  cmp ecx, dword [rdi + CharacterQueue.capacity]
-  jne .noGrow
-
-  with_saved_regs rdi, rsi
-    call _CharacterQueueGrow
-  end with_saved_regs
-.noGrow:
+func _h5aCharacterQueueClear, public
+;; RDI: H5aCharacterQueue *queue
+;; -> void
+  mov rdx, rdi
 
   xor rcx,rcx
-  mov ecx, dword [rdi + CharacterQueue.back_idx]
-  mov rax, qword [rdi + CharacterQueue.data]
-  mov dword [rax + rcx * 4], esi ;q->data[q->back] = c
-  inc dword [rdi + CharacterQueue.size] ;++q->size
+  mov ecx, dword [rdx + H5aCharacterQueue.capacity]
+  mov rdi, qword [rdx + H5aCharacterQueue.data]
+  zero_init rdi, ecx
 
-  xor edx,edx
-  mov eax, dword [rdi + CharacterQueue.back_idx]
-  inc eax
-  div dword [rdi + CharacterQueue.capacity]
-  mov dword [rdi + CharacterQueue.back_idx], edx
+  xor eax,eax
+  mov dword [rdx + H5aCharacterQueue.size], eax
+  mov dword [rdx + H5aCharacterQueue.front_idx], eax
+  mov dword [rdx + H5aCharacterQueue.back_idx], eax
 
-  xor rax,rax
-  mov eax, edi
-
-  leave
   ret
+end func
 
-
-_CharacterQueuePopFront:
-  ;; RDI: _NonNull CharacterQueue *queue
-  ;; -> RAX (EAX): char32_t c
-  ;; -> RDX (DL): bool status
-  push rbp
-  mov rbp, rsp
-
-  mov ecx, dword [rdi + CharacterQueue.size]
-  test ecx,ecx
-  jnz .haveData
-
-  xor rax,rax
-  xor rdx,rdx
-
-  leave
-  ret
-
-.haveData:
-  ;; q->front_idx = (q->front_idx + 1) % q->capacity
-  xor edx,edx
-  xor rax,rax
-  mov eax, dword [rdi + CharacterQueue.front_idx]
-  mov rcx, qword [rdi + CharacterQueue.data]
-  mov r8d, dword [rcx + rax * 4]
-
-  inc eax
-  ;; q->front_idx = (q->front_idx + 1) % q->capacity
-  div dword [rdi + CharacterQueue.capacity]
-  mov dword [rdi + CharacterQueue.front_idx], edx
-  
-  dec dword [rdi + CharacterQueue.size]
-
-  xor rdx,rdx
-  mov rdx, 1
-  ; no need to upper-clear
-  mov eax, r8d
-
-  leave
-  ret
-
-
-_CharacterQueueSubscript:
-  ;;
-  ;; C++ like array[] operator, except it doesn't create missing spots
-  ;;
-  ;;
-  ;; RDI (a): CharacterQueue *cqueue
-  ;; ESI (a): i32 index
-  ;; -> RAX: char32_t *addr
-  ;movzx rsi, esi
-  cmp esi, dword [rdi + CharacterQueue.size]
-  jge .fail
-
-  mov rdx, qword [rdi + CharacterQueue.data]
-
-  mov ecx, dword [rdi + CharacterQueue.capacity]
-
-  ;sub ecx, dword [rdi + CharacterQueue.front_idx]
-  mov eax, dword [rdi + CharacterQueue.front_idx]
-  sub ecx, eax
-
-  cmp esi, ecx
-  jge .lateSlice
-  ;; [c c c 0 0 0 c c]
-  ;;        ^     ^
-  ;;        e     f
-  ;;        n     r
-  ;;        d     o
-  ;;              n
-  ;;              t
-  ;;
-  ;;  a a a a     b b
-  ;;
-  ;; a: late slice
-  ;; b: early slice
-.earlySlice:
-  add esi, dword [rdi + CharacterQueue.front_idx]
-.lateSlice:
-  lea rax, [rdx + rsi * 4]
-  ret
-  
-.fail:
-  xor rax,rax
-  ret

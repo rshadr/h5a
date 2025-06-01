@@ -309,8 +309,42 @@ calminstruction zero_init? ptr*,size*
 
 already_rsi:
   asm xor al,al
-  arrange var, =mov =rcx, size
+  asm xor rcx,rcx
+  arrange var, =mov =ecx, size
   assemble var
   asm rep stosb
 end calminstruction
+
+
+macro func? name*, vis*
+
+  calminstruction maybe_vis n*, v*
+    local var
+    ;; Always do public until we figure out debug symbols...
+    ;match =public?, v
+    ;jyes vis_public
+    ;exit
+
+  vis_public:
+    arrange var, =public n
+    assemble var
+    exit
+  end calminstruction
+
+  maybe_vis name, vis
+  label name
+  purge maybe_vis
+
+  calminstruction ? line&
+    match =end? =func?, line
+    jyes finish
+
+    assemble line
+    exit
+
+  finish:
+    asm purge ?
+    exit
+  end calminstruction
+end macro
 

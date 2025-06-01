@@ -11,49 +11,35 @@ format ELF64
 
 
 extrn _h5aStringClear
-extrn _CharacterQueuePushBack
-extrn _CharacterQueuePopFront
-extrn _CharacterQueueSubscript
+extrn _h5aCharacterQueuePushBack
+extrn _h5aCharacterQueuePopFront
+extrn _h5aCharacterQueueSubscript
 extrn _h5aTreeBuilderAcceptToken
 
 extrn _k_h5a_Tokenizer_flags_table
 extrn _k_h5a_Tokenizer_spc_action_table
 extrn _k_h5a_Tokenizer_common_dispatch_table
 
-public _h5aTokenizerError
-public _h5aTokenizerEat
-public _h5aTokenizerEatSensitive
-public _h5aTokenizerEatInsensitive
-public _h5aTokenizerCreateDoctype
-public _h5aTokenizerCreateComment
-public _h5aTokenizerCreateStartTag
-public _h5aTokenizerCreateEndTag
-public _h5aTokenizerStartAttribute
-public _h5aTokenizerEmitDoctype
-public _h5aTokenizerEmitComment
-public _h5aTokenizerEmitCharacter
-public _h5aTokenizerEmitTag
-public _h5aTokenizerEmitEof
-public _h5aTokenizerHaveAppropriateEndTag
-public _h5aTokenizerFlushEntityChars
-public _h5aTokenizerCharRefInAttr
-public _h5aTokenizerMain
-
 
 section '.text' executable
 
-_h5aTokenizerError:
+func _h5aTokenizerError, public
   ;; R12 (s): H5aParser *parser
   ;; RDI (a): char const *errmsg
   ;; -> void
+  ; XXX
   ret
+end func
 
-_h5aTokenizerEatFilterNone:
+
+func _h5aTokenizerEatFilterNone, private
   ;; Identity filter
   ;; inout EDI: char32 c
   ret
+end func
 
-_h5aTokenizerEatFilterCase:
+
+func _h5aTokenizerEatFilterCase, private
   ;; Lower to upper ASCII filter
   ;; inout EDI: char32 c
   cmp edi, 'A'
@@ -65,9 +51,10 @@ _h5aTokenizerEatFilterCase:
 
 .finish:
   ret
+end func
 
-public _h5aTokenizerEatGeneric
-_h5aTokenizerEatGeneric:
+
+func _h5aTokenizerEatGeneric, public
   ;; R12 (s): H5aParser *parser
   ;; RDI (a): char8 const *str
   ;; RSI (a): u64 len
@@ -100,7 +87,7 @@ _h5aTokenizerEatGeneric:
   ; filter buffer
   lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
   mov rsi, r15
-  call _CharacterQueueSubscript
+  call _h5aCharacterQueueSubscript
   mov esi, dword [rax]
   call r14
   mov ecx, esi
@@ -137,7 +124,7 @@ _h5aTokenizerEatGeneric:
     jge .success.finish
 
     lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
-    call _CharacterQueuePopFront
+    call _h5aCharacterQueuePopFront
 
     inc rbx
     jmp .success.popLoop
@@ -156,27 +143,35 @@ _h5aTokenizerEatGeneric:
   xor al,al
   leave
   ret
+end func
 
-_h5aTokenizerEat:
-  ;; R12 (s): H5aParser *parser
-  ;; RDI (a): char8 const *str
-  ;; RSI (a): u64 len
+
+func _h5aTokenizerEat, public
+;; R12 (s): H5aParser *parser
+;; RDI (a): char8 const *str
+;; RSI (a): u64 len
   lea rdx, [_h5aTokenizerEatFilterNone]
   jmp _h5aTokenizerEatGeneric
+end func
 
-_h5aTokenizerEatInsensitive:
-  ;; R12 (s): H5aParser *parser
-  ;; RDI (a): char8 const *str
-  ;; RSI (a): u64 len
+
+func _h5aTokenizerEatInsensitive, public
+;; R12 (s): H5aParser *parser
+;; RDI (a): char8 const *str
+;; RSI (a): u64 len
   lea rdx, [_h5aTokenizerEatFilterCase]
   jmp _h5aTokenizerEatGeneric
+end func
 
-_h5aTokenizerEatSensitive:
+
+func _h5aTokenizerEatSensitive, public
   lea rdx, [_h5aTokenizerEatFilterNone]
   jmp _h5aTokenizerEatGeneric
+end func
 
-_h5aTokenizerCreateDoctype:
-  ;; R12 (s): H5aParser *parser
+
+func _h5aTokenizerCreateDoctype, public
+;; R12 (s): H5aParser *parser
   with_stack_frame
     lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
     call _h5aStringClear
@@ -189,16 +184,20 @@ _h5aTokenizerCreateDoctype:
     mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x00
   end with_stack_frame
   ret
+end func
 
-_h5aTokenizerCreateComment:
+
+func _h5aTokenizerCreateComment, public
 ;; R12 (s): H5aParser *parser
   with_stack_frame
     lea rdi, [r12 + H5aParser.tokenizer.comment]
     call _h5aStringClear
   end with_stack_frame
   ret
+end func
 
-_h5aTokenizerCreateTag:
+
+func _h5aTokenizerCreateTag, private
 ;; R12 (s): H5aParser *parser
 ;; RDI (arg): H5aTokenType type
 ;; -> void
@@ -212,23 +211,30 @@ _h5aTokenizerCreateTag:
     mov byte [r12 + H5aParser.tokenizer.tag + TagToken.acknowledged_self_closing_flag], al
   end with_stack_frame
   ret
+end func
 
-_h5aTokenizerCreateStartTag:
+
+func _h5aTokenizerCreateStartTag, public
   xor rdi,rdi
   mov dil, TOKEN_START_TAG
   jmp _h5aTokenizerCreateTag
+end func
 
-_h5aTokenizerCreateEndTag:
+
+func _h5aTokenizerCreateEndTag, public
   xor rdi,rdi
   mov dil, TOKEN_END_TAG
   jmp _h5aTokenizerCreateTag
+end func
 
-_h5aTokenizerStartAttribute:
+
+func _h5aTokenizerStartAttribute, public
 ; XXX ...
   ret
+end func
 
-public _h5aTokenizerEmitToken
-_h5aTokenizerEmitToken:
+
+func _h5aTokenizerEmitToken, private
 ;; R12 (s): H5aParser *parser
 ;; RDI (a): union Token token
 ;; RSI (a): e8 type
@@ -237,25 +243,28 @@ _h5aTokenizerEmitToken:
     call _h5aTreeBuilderAcceptToken
   end with_stack_frame
   ret
+end func
 
 
-_h5aTokenizerEmitDoctype:
+func _h5aTokenizerEmitDoctype, public
 ;; R12 (s): H5aParser *parser
   lea rdi, [r12 + H5aParser.tokenizer.doctype]
   xor rsi,rsi
   mov sil, TOKEN_DOCTYPE
   jmp _h5aTokenizerEmitToken
+end func
 
 
-_h5aTokenizerEmitComment:
+func _h5aTokenizerEmitComment, public
 ;; R12 (s): H5aParser *parser
   lea rdi, [r12 + H5aParser.tokenizer.comment]
   xor rsi,rsi
   mov sil, TOKEN_COMMENT
   jmp _h5aTokenizerEmitToken
+end func
 
 
-_h5aTokenizerEmitCharacter:
+func _h5aTokenizerEmitCharacter, public
 ;; R12 (s): H5aParser *parser
 ;; RDI (EDI): char32_t c
 ;; -> void
@@ -277,47 +286,48 @@ _h5aTokenizerEmitCharacter:
 .yes:
   mov sil, TOKEN_WHITESPACE
   jmp _h5aTokenizerEmitToken
+end func
 
 
-_h5aTokenizerEmitTag:
+func _h5aTokenizerEmitTag, public
 ;; R12 (s): H5aParser *parser
 ;; -> void
   lea rdi, [r12 + H5aParser.tokenizer.tag]
   ; XXX
   ;movzx rsi, byte [r12 + H5aParser.tokeniz
   jmp _h5aTokenizerEmitToken
+end func
 
 
-_h5aTokenizerEmitEof:
+func _h5aTokenizerEmitEof, public
   ;; R12 (s): H5aParser *parser
   ;; [...]
   ;; -> uint8 status
-  push rbp
-  mov rbp, rsp
-
-  xor edi,edi
-  mov sil, TOKEN_EOF
-  call _h5aTokenizerEmitToken
-  mov al, RESULT_EOF_REACHED
-
-  leave
+  with_stack_frame
+    xor edi,edi
+    mov sil, TOKEN_EOF
+    call _h5aTokenizerEmitToken
+    mov al, RESULT_EOF_REACHED
+  end with_stack_frame
   ret
+end func
 
 
-_h5aTokenizerHaveAppropriateEndTag:
-  ;; R12 (s): H5aParser *parser
-  ;; -> RAX (AL): bool result
+func _h5aTokenizerHaveAppropriateEndTag, public
+;; R12 (s): H5aParser *parser
+;; -> RAX (AL): bool result
   push rbp
   mov rbp, rsp
   ;...
   xor rax,rax
   leave
   ret
+end func
 
 
-_h5aTokenizerFlushEntityChars:
-  ;; R12 (s): H5aParser *parser
-  ;; -> void
+func _h5aTokenizerFlushEntityChars, public
+;; R12 (s): H5aParser *parser
+;; -> void
   push rbp
   mov rbp, rsp
 
@@ -326,7 +336,7 @@ with_saved_regs r8, rbx
     mov r8b, al
 
 .loop:
-    mov eax, dword [r12 + H5aParser.tokenizer.input_buffer + CharacterQueue.size]
+    mov eax, dword [r12 + H5aParser.tokenizer.input_buffer + H5aCharacterQueue.size]
     test eax,eax
     jz .finish
 
@@ -338,8 +348,10 @@ with_saved_regs r8, rbx
 end with_saved_regs
   leave
   ret
+end func
 
-_h5aTokenizerCharRefInAttr:
+
+func _h5aTokenizerCharRefInAttr, public
   ;; R12 (s): H5aParser *parser
   ;; -> RAX (AL): bool result
   xor rax,rax
@@ -357,9 +369,10 @@ _h5aTokenizerCharRefInAttr:
 .yes:
   mov al, 1
   ret
+end func
 
-public _h5aTokenizerPrefetchChars
-_h5aTokenizerPrefetchChars:
+
+func _h5aTokenizerPrefetchChars, public
 ;; R12 (omni): H5aParser *parser
 ;; RDI (a): u32 count
 ;; -> bool have_that_many
@@ -380,11 +393,11 @@ _h5aTokenizerPrefetchChars:
   xor rbx,rbx
   mov ebx, edi
   mov r13b, 1
-  ;;sub ebx, dword [r12 + H5aParser.tokenizer.input_buffer + CharacterQueue.size]
+  ;;sub ebx, dword [r12 + H5aParser.tokenizer.input_buffer + H5aCharacterQueue.size]
 
 .loop:
   ;cmp dword [r12 + H5aParser.tokenizer.input_buffer + CharacterQueue.size], ebx
-  mov ecx, dword [r12 + H5aParser.tokenizer.input_buffer + CharacterQueue.size]
+  mov ecx, dword [r12 + H5aParser.tokenizer.input_buffer + H5aCharacterQueue.size]
   cmp ecx, ebx
   jge .finish
 
@@ -403,7 +416,7 @@ _h5aTokenizerPrefetchChars:
     lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
     xor rsi,rsi
     mov sil, 0x0A
-    call _CharacterQueuePushBack
+    call _h5aCharacterQueuePushBack
     mov rdx, rax
   end with_saved_regs
 
@@ -416,7 +429,7 @@ _h5aTokenizerPrefetchChars:
   lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
   xor rsi,rsi
   mov esi, edx
-  call _CharacterQueuePushBack
+  call _h5aCharacterQueuePushBack
   mov rdx, rax
 
 .noNoCarriage:
@@ -439,23 +452,26 @@ _h5aTokenizerPrefetchChars:
 
 .noEof:
   jmp .loop
+end func
 
-public _h5aTokenizerGetChar
-_h5aTokenizerGetChar:
+
+func _h5aTokenizerGetChar, public
 ;; R12 (omni): H5aParser *parser
 
-  xor rdi,rdi
-  mov dil, 1
-  call _h5aTokenizerPrefetchChars
+  with_stack_frame
+    xor rdi,rdi
+    mov dil, 1
+    call _h5aTokenizerPrefetchChars
 
-  ; XXX: assert not empty
-  lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
-  call _CharacterQueuePopFront
-
+    ; XXX: assert not empty
+    lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
+    call _h5aCharacterQueuePopFront
+  end with_stack_frame
   ret
+end func
 
 
-_h5aTokenizerMain:
+func _h5aTokenizerMain, public
 ;; stack entry: [r12, RET]
 ;; R12 (omni:lost): H5aParser *
 ;; -> EAX: enum H5aResult
@@ -560,4 +576,5 @@ _h5aTokenizerMain:
     pop r12 ;upscope
     xor rax,rax
     ret
+end func
 

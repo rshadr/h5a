@@ -3,7 +3,7 @@ build/
 *.d
 *.a
 *.core
-*.vgcore
+vgcore.*
 massif.out.*
 callgrind.out.*
 perf.*

@@ -1,9 +1,11 @@
 
 macro state? name*,index_name*
   local prefix, have_any, enable_getchar, in_seq, beyond_index, flags
+  local enable_explicit_action
   prefix equ _h5aTokenizerHandle.name
   have_any = 0
   enable_getchar = 1
+  enable_explicit_action = 0
   in_seq = 0
   beyond_index = 0
   flags = 0
@@ -24,6 +26,20 @@ macro state? name*,index_name*
     arrange var, =label prefix.=spcActionStart
     assemble var
     asm nop
+  end calminstruction
+
+  calminstruction maybe_emit_explicit_action_tail
+    local var
+    compute var, enable_explicit_action
+    check var
+    jno finish
+
+    ; makes me want to puke, brother
+    compute enable_explicit_action, 0
+    asm ret
+
+  finish:
+    exit
   end calminstruction
 
   calminstruction seq_maybe_emit_beyond close_seqs*
@@ -83,7 +99,7 @@ macro state? name*,index_name*
       arrange var, =label l
       assemble var
 
-    asm with_stack_frame
+    asm with_stack_frame ;align that damn stack...
       arrange var, =lea =rdi, =[seq_label=]
       assemble var
       arrange var, =mov =rsi, =sizeof.seq_label
@@ -162,10 +178,12 @@ macro state? name*,index_name*
       exit
 
     enable_spcaction:
+      compute enable_explicit_action ,1
       compute flags, (flags or STATE_BIT_SPC_ACTION)
       exit
 
     seq_yescase:
+      call maybe_emit_explicit_action_tail
       compute flags, (flags or STATE_BIT_SPC_ACTION)
       compute val, 0
       call seq_maybe_emit_beyond, val
@@ -174,6 +192,7 @@ macro state? name*,index_name*
       exit
 
     seq_nocase:
+      call maybe_emit_explicit_action_tail
       compute flags, (flags or STATE_BIT_SPC_ACTION)
       compute val, 0
       call seq_maybe_emit_beyond, val
@@ -201,45 +220,67 @@ macro state? name*,index_name*
       jump unknown ;fallback
 
     grp_alpha:
+      call maybe_emit_explicit_action_tail
       arrange var, =char_range prefix,'a','z'
       assemble var
-      ;fallthrough
+      arrange var, =char_range prefix,'A','Z'
+      assemble var
+      exit
+
     grp_upalpha:
+      call maybe_emit_explicit_action_tail
       arrange var, =char_range prefix,'A','Z'
       assemble var
       exit
 
     grp_lowalpha:
+      call maybe_emit_explicit_action_tail
+      arrange var, =char_range prefix,'a','z'
       arrange var, =char_range prefix,'a','z'
       assemble var
       exit
 
     grp_alnum:
+      call maybe_emit_explicit_action_tail
+      arrange var, =char_range prefix,'a','z'
       arrange var, =char_range prefix,'A','Z'
       assemble var
       arrange var, =char_range prefix,'a','z'
       assemble var
+      arrange var, =char_range prefix,'0','9'
+      assemble var
+      exit
+
     grp_digit:
+      call maybe_emit_explicit_action_tail
       arrange var, =char_range prefix,'0','9'
       assemble var
       exit
 
     grp_hex:
+      call maybe_emit_explicit_action_tail
       arrange var, =char_range prefix,'0','9'
       assemble var
+      arrange var, =char_range prefix,'A','F'
+      assemble var
+      exit
+
     grp_uphex:
       ;err 'untested' ;maybe wrong?
+      call maybe_emit_explicit_action_tail
       arrange var, =char_range prefix,'A','F'
       assemble var
       exit
 
     grp_lowhex:
       ;err 'untested' ;maybe wrong?
+      call maybe_emit_explicit_action_tail
       arrange var, =char_range prefix,'a', 'f'
       assemble var
       exit
 
     codepoint:
+      call maybe_emit_explicit_action_tail
       arrange val, 1
       call seq_maybe_emit_beyond, val
       arrange var, 0x#code
@@ -251,6 +292,7 @@ macro state? name*,index_name*
       exit
 
     eof:
+      call maybe_emit_explicit_action_tail
       arrange val, 1
       call seq_maybe_emit_beyond, val
       arrange var, =public prefix.=eof
@@ -260,6 +302,7 @@ macro state? name*,index_name*
       exit
 
     any:
+      call maybe_emit_explicit_action_tail
       compute val, enable_getchar
       call seq_maybe_emit_beyond, val
       arrange var, =public prefix.=any
@@ -352,7 +395,7 @@ macro generate_tables?
         ; flags should always exist??
 
         compute val, (flags and STATE_BIT_NO_GETCHAR)
-        check val > 0
+        check val
         jno consuming_state
 
         arrange var, =dq 0xBEEFCAFE
