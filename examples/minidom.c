@@ -91,6 +91,11 @@ typedef struct MdNode_s {
   MdNodeType node_type;
 } MdNode;
 
+typedef struct MdComment_s {
+  MdNode node;
+  char *content;
+} MdComment;
+
 typedef struct MdDoctype_s {
   MdNode node;
 
@@ -155,6 +160,7 @@ static void mdSinkParseError (H5aSink *self, char const *msg);
 [[nodiscard]] static H5aHandle mdSinkGetDocument (H5aSink *self);
 static void mdSinkSetQuirksMode (H5aSink *self, H5aQuirksMode mode);
 static bool mdSinkSameNode (H5aSink *self, H5aHandle x, H5aHandle y);
+static H5aHandle mdSinkCreateComment (H5aSink *self, H5aStringView text);
 static void mdSinkAppend (H5aSink *self, H5aHandle parent, H5A_NODE_OR_TEXT_HANDLE(child));
 static void mdSinkAppendDoctypeToDocument (H5aSink *self, H5aStringView name,
   H5aStringView public_id, H5aStringView system_id);
@@ -172,7 +178,7 @@ static const H5aSinkVTable k_minidom_sink_vtable = {
   .same_node = mdSinkSameNode,
   .elem_name = NULL,
   .create_element = NULL,
-  .create_comment = NULL,
+  .create_comment = mdSinkCreateComment,
   .append = mdSinkAppend,
   .append_before_sibling = NULL,
   .append_doctype_to_document = mdSinkAppendDoctypeToDocument,
@@ -400,6 +406,14 @@ mdNode_dtor (void *user_data)
   mdHandleVectorDestroy(&node->child_nodes);
 }
 
+static void
+mdComment_dtor (void *user_data)
+{
+  MdComment *comment = user_data;
+  free(comment->content);
+  mdNode_dtor(user_data);
+}
+
 
 static void
 mdDoctype_ctor (MdDoctype *doctype,
@@ -528,6 +542,22 @@ mdSinkSameNode (H5aSink *self, H5aHandle x, H5aHandle y)
 }
 
 
+static H5aHandle
+mdSinkCreateComment (H5aSink *self, H5aStringView text)
+{
+  (void) self;
+
+  auto handle = MD_ALLOC(Comment);
+  MdComment *comment = handle.instance;
+
+  mdNode_ctor((MdNode *)(comment), MD_NODETYPE_COMMENT);
+  comment->content = strndup(text.data, text.size);
+
+  return mdMdHandleToH5a(handle);
+}
+
+
+H5A_SINK_CALLBACK_ATTR
 static void
 mdSinkAppend (H5aSink *self, H5aHandle parent, H5A_NODE_OR_TEXT_HANDLE(child))
 {
@@ -536,6 +566,11 @@ mdSinkAppend (H5aSink *self, H5aHandle parent, H5A_NODE_OR_TEXT_HANDLE(child))
   (void) parent;
   (void) child;
   (void) child_is_string;
+
+  if (! child_is_string ) {
+  } else {
+    abort();
+  }
 }
 
 
@@ -565,6 +600,7 @@ mdSinkAppendDoctypeToDocument (H5aSink *self,
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 static void
 mdSinkRemoveFromParent (H5aSink *self, H5aHandle target)
 {
@@ -573,6 +609,7 @@ mdSinkRemoveFromParent (H5aSink *self, H5aHandle target)
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 static void
 mdSinkReparentChildren (H5aSink *self, H5aHandle node, H5aHandle new_parent)
 {
@@ -582,6 +619,7 @@ mdSinkReparentChildren (H5aSink *self, H5aHandle node, H5aHandle new_parent)
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 static H5aTag
 mdSinkGetTagByName (H5aSink *self, H5aStringView name)
 {
@@ -592,6 +630,7 @@ mdSinkGetTagByName (H5aSink *self, H5aStringView name)
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 static void
 mdSinkDestroyHandle (H5aSink *self, H5aHandle handle)
 {

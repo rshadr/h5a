@@ -11,7 +11,10 @@ include "insertion_modes.g"
 
 format ELF64
 
+extrn _h5aTreeBuilderAppendComment
 extrn _h5aTreeBuilderAppendCommentToDocument
+extrn _h5aTreeBuilderGenericRcdataParse
+extrn _h5aTreeBuilderGenericRawTextParse
 
 public _k_h5a_TreeBuilder_handlerTable
 
@@ -51,9 +54,6 @@ mode initial,INITIAL_MODE
     ret
 
   [[DOCTYPE]]
-;public the_razor
-;label the_razor
-
     namespace initial_doctype
       with_stack_frame
 .check1:
@@ -67,8 +67,6 @@ mode initial,INITIAL_MODE
 .action1:
         ; XXX: parse error
 .action2:
-public razor
-label razor
         mov rdi, qword [r12 + H5aParser.sink.user_data]
 
         mov rsi, qword [r13 + DoctypeToken.name + H5aString.data]
@@ -194,7 +192,7 @@ mode beforeHead,BEFORE_HEAD_MODE
 
   [[Comment]]
     with_stack_frame
-      ; ...
+      call _h5aTreeBuilderAppendComment
     end with_stack_frame
     xor al,al
     ret
@@ -203,8 +201,10 @@ mode beforeHead,BEFORE_HEAD_MODE
     process_using_rules! IN_BODY_MODE
 
   [[Start tag "head"]]
-    ; ...
-    mov byte [r12 + H5aParser.treebuilder.mode], IN_HEAD_MODE
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], IN_HEAD_MODE
+    end with_stack_frame
     xor al,al
     ret
 
@@ -228,6 +228,223 @@ mode beforeHead,BEFORE_HEAD_MODE
 end mode
 
 
+mode inHead,IN_HEAD_MODE
+
+  [[Whitespace]]
+    with_stack_frame
+      ;call _h5aTreeBuilderInsertCharacter
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Comment]]
+    with_stack_frame
+      call _h5aTreeBuilderAppendComment
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[DOCTYPE]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Start tag "html"]]
+    process_using_rules! IN_BODY_MODE
+
+  [[Start tag "base"]]
+  [[Start tag "basefont"]]
+  [[Start tag "bgsound"]]
+  [[Start tag "link"]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag "meta"]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag "title"]]
+    jmp _h5aTreeBuilderGenericRcdataParse
+
+
+namespace noscript_and_clique
+
+  [[Start tag "noscript"]]
+    ; XXX: test
+    xor al,al
+    test al,al
+    jz noscript_scripting_enabled
+noscript_scripting_disabled:
+    with_stack_frame
+      ;XXX: insert element
+      mov byte [r12 + H5aParser.treebuilder.mode], IN_HEAD_NOSCRIPT_MODE
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag "noframes"]]
+  [[Start tag "style"]]
+noscript_scripting_enabled:
+    jmp _h5aTreeBuilderGenericRawTextParse
+
+end namespace
+
+
+  [[Start tag "script"]]
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
+      mov cl, byte [r12 + H5aParser.treebuilder.mode]
+      mov byte [r12 + H5aParser.treebuilder.original_mode], cl
+      mov byte [r12 + H5aParser.treebuilder.mode], TEXT_MODE
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[End tag "head"]]
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], AFTER_HEAD_MODE
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[End tag "body"]]
+  [[End tag "html"]]
+  [[End tag "br"]]
+    goto! anything_else
+
+  [[Start tag "template"]]
+    ; ...
+    xor al,al
+    ret
+
+  [[End tag "template"]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag "head"]]
+  [[Any other end tag]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Anything else]]
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], AFTER_HEAD_MODE
+    end with_stack_frame
+    mov al, RESULT_REPROCESS
+    ret
+
+end mode
+
+
+mode inHeadNoscript,IN_HEAD_NOSCRIPT_MODE
+  ; ...
+
+  [[Anything else]]
+    with_stack_frame
+    ;parse_error!
+      mov byte [r12 + H5aParser.treebuilder.mode], IN_HEAD_MODE
+    end with_stack_frame
+    mov al, RESULT_REPROCESS
+    ret
+
+end mode
+
+
+mode afterHead,AFTER_HEAD_MODE
+
+  [[Whitespace]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Comment]]
+    ; ...
+    xor al,al
+    ret
+
+  [[DOCTYPE]]
+    ; ...
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Start tag "html"]]
+    process_using_rules! IN_BODY_MODE
+
+  [[Start tag "body"]]
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], IN_BODY_MODE
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag "frameset"]]
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], IN_FRAMESET_MODE
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag "base"]]
+  [[Start tag "basefont"]]
+  [[Start tag "bgsound"]]
+  [[Start tag "link"]]
+  [[Start tag "meta"]]
+  [[Start tag "noframes"]]
+  [[Start tag "script"]]
+  [[Start tag "style"]]
+  [[Start tag "template"]]
+  [[Start tag "title"]]
+    with_stack_frame
+      ; ...
+      call_rules! IN_HEAD_MODE
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[End tag "template"]]
+    process_using_rules! IN_HEAD_MODE
+
+  [[End tag "body"]]
+  [[End tag "html"]]
+  [[End tag "br"]]
+    goto! anything_else
+
+  [[Start tag "head"]]
+  [[Any other end tag]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Anything else]]
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], IN_BODY_MODE
+    end with_stack_frame
+    mov al, RESULT_REPROCESS
+    ret
+
+end mode
+
+
 ; ...
 
 
@@ -236,8 +453,8 @@ mode inBody,IN_BODY_MODE
   [[Character U+0000]]
     with_stack_frame
       ; ...
-      mov al, RESULT_IGNORE
     end with_stack_frame
+    mov al, RESULT_IGNORE
     ret
 
   [[Whitespace]]
@@ -245,12 +462,110 @@ mode inBody,IN_BODY_MODE
       ; XXX: reconstruct
       ; XXX: insert character
     end with_stack_frame
+    xor al,al
     ret
 
   [[Any other character]]
     with_stack_frame
       ; ...
     end with_stack_frame
+    xor al,al
+    ret
+
+  [[Comment]]
+    with_stack_frame
+      call _h5aTreeBuilderAppendComment
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[DOCTYPE]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Start tag "html"]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag "base"]]
+  [[Start tag "basefont"]]
+  [[Start tag "bgsound"]]
+  [[Start tag "link"]]
+  [[Start tag "meta"]]
+  [[Start tag "noframes"]]
+  [[Start tag "script"]]
+  [[Start tag "style"]]
+  [[Start tag "template"]]
+  [[Start tag "title"]]
+  [[End tag "template"]]
+    process_using_rules! IN_HEAD_MODE
+
+  [[Start tag "body"]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag "frameset"]]
+    ; ...
+    xor al,al
+    ret
+
+  [[EOF]]
+    ; ...
+    mov al, RESULT_STOP
+    ret
+
+  [[End tag "body"]]
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], AFTER_BODY_MODE
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[End tag "html"]]
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], AFTER_BODY_MODE
+    end with_stack_frame
+    mov al, RESULT_REPROCESS
+    ret
+
+  [[Start tag "address"]]
+  [[Start tag "article"]]
+  [[Start tag "aside"]]
+  [[Start tag "blockquote"]]
+  [[Start tag "center"]]
+  [[Start tag "details"]]
+  [[Start tag "dialog"]]
+  [[Start tag "dir"]]
+  [[Start tag "div"]]
+  [[Start tag "dl"]]
+  [[Start tag "fieldset"]]
+  [[Start tag "figcaption"]]
+  [[Start tag "figure"]]
+  [[Start tag "footer"]]
+  [[Start tag "header"]]
+  [[Start tag "hgroup"]]
+  [[Start tag "main"]]
+  [[Start tag "menu"]]
+  [[Start tag "nav"]]
+  [[Start tag "ol"]]
+  [[Start tag "p"]]
+  [[Start tag "search"]]
+  [[Start tag "section"]]
+  [[Start tag "summary"]]
+  [[Start tag "ul"]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
     ret
 
   ; ...

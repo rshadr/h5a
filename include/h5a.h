@@ -32,6 +32,19 @@ typedef enum {
   H5A_QUIRKS_MODE_QUIRKS,
 } H5aQuirksMode;
 
+#if __STDC_VERSION__ >= 202000 || defined(__cplusplus)
+typedef enum : uint32_t {
+#else
+typedef enum {
+#endif
+  H5A_NAMESPACE_HTML = 0,
+  H5A_NAMESPACE_MATHML,
+  H5A_NAMESPACE_SVG,
+  H5A_NAMESPACE_XLINK,
+  H5A_NAMESPACE_XML,
+  H5A_NAMESPACE_XMLNS,
+} H5aNamespace;
+
 
 /* WARNING: Must be manually synced with "src/tags.inc" */
 #if __STDC_VERSION__ >= 202000 || defined (__cplusplus)
@@ -198,6 +211,19 @@ typedef enum {
   H5A_PLACEHOLDER_TAG = (uint32_t)(~0),
 } H5aTag;
 
+/* only used for backwards */
+typedef enum : uint32_t {
+  H5A_MATHMLTAG_MATH = 0,
+  // ...
+  H5A_PLACEHOLDER_MATHMLTAG = (uint32_t)(~0),
+} H5aMathMLTag;
+
+typedef enum : uint32_t {
+  H5A_SVGTAG_SVG = 0,
+  // ...
+  H5A_PLACEHOLDER_SVGTAG = (uint32_t)(~0),
+} H5aSVGTag;
+
 
 /*
  * Sinks are not implemented by the lib itself
@@ -212,9 +238,25 @@ typedef struct H5aHandle_s {
 } H5aHandle;
 
 typedef struct H5aStringView_s {
-  char const *data;
-  size_t size;
+  char const *  data;
+  size_t        size;
 } H5aStringView;
+
+typedef struct H5aQualifiedNameView_s {
+  H5aStringView  s;
+  H5aNamespace   name_space;
+  uint32_t       tag;
+} H5aQualifiedNameView;
+
+typedef struct H5aQualifiedName {
+  H5aNamespace  name_space;
+  uint32_t      tag;
+} H5aQualifiedName;
+
+typedef struct H5aAttributeView_s {
+  H5aStringView name;
+  H5aStringView value;
+} H5aAttributeView;
 
 /*
  * Hack to avoid stack-based parameter passing.
@@ -252,7 +294,7 @@ typedef struct H5aSinkVTable_s {
   void* (*elem_name)
     (H5aSink *self, H5aHandle target);
   H5aHandle (*create_element)
-    (H5aSink *self, void *name, void *attrs);
+    (H5aSink *self, H5aQualifiedNameView name, const H5aAttributeView *attrs, size_t num_attrs);
   H5aHandle (*create_comment)
     (H5aSink *self, H5aStringView text);
   void (*append)
@@ -282,14 +324,6 @@ typedef struct H5aSinkVTable_s {
   void (*destroy_handle)
     (H5aSink *self, H5aHandle handle);
 } H5aSinkVTable;
-
-typedef struct H5aSinkCreateInfo_s {
-  union {
-    H5aSink *sink;
-    void *p;
-  } user_data;
-  const H5aSinkVTable *vtable;
-} H5aSinkCreateInfo;
 
 /* opaque */
 typedef struct H5aParser_s H5aParser;

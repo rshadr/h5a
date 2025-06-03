@@ -257,6 +257,8 @@ macro mode? name*,index_name*
     jyes cmd_parse_error
     match =goto=! =anything_else, line
     jyes goto_always
+    match call_rules! redir_mode, line
+    jyes call_rules
     match =process_using_rules=! redir_mode, line
     jyes process_using_rules
 
@@ -496,6 +498,12 @@ macro mode? name*,index_name*
 
   goto_always:
     arrange var, =jmp prefix.=anythingElse
+    assemble var
+    exit
+
+  call_rules:
+    asm lea rcx, [_k_h5a_TreeBuilder_handlerTable]
+    arrange var, =call =qword [=rcx + (redir_mode * 8)]
     assemble var
     exit
 

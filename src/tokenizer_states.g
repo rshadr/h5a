@@ -140,7 +140,7 @@ macro state? name*,index_name*
     jyes finish
 
     ;; Properties
-    match =@NoConsume, line
+    match =@NoConsumeSingleCharacter, line
     jyes disable_getchar
     match =@SpecialAction, line
     jyes enable_spcaction

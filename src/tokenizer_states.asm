@@ -1797,7 +1797,7 @@ end state
 
 state markupDeclarationOpen,MARKUP_DECLARATION_OPEN_STATE
 
-  @NoConsume
+  @NoConsumeSingleCharacter
 
   [[Exactly "--"]]
     with_stack_frame
@@ -2341,6 +2341,7 @@ end state
 
 
 state afterDoctypePublicKeyword,AFTER_DOCTYPE_PUBLIC_KEYWORD_STATE
+
   [[U+0009 CHARACTER TABULATION]]
   [[U+000A LINE FEED]]
   [[U+000C FORM FEED]]
@@ -2444,14 +2445,10 @@ end state
 
 state namedCharacterReference,NAMED_CHARACTER_REFERENCE_STATE
 
-  @NoConsume
+  @NoConsumeSingleCharacter
   @SpecialAction
 
-public named_resolve
-named_resolve:
-
-  with_saved_regs rbx, r13, r14, rcx
-    ; push RCX for stack alignment
+  with_saved_regs rbx, r13, r14
     lea rbx, [_k_h5a_entityTable]
     xor r13,r13
     xor r14,r14
@@ -2557,7 +2554,7 @@ state hexadecimalCharacterReference,HEXADECIMAL_CHARACTER_REFERENCE_STATE
   [[ASCII digit]]
     mov rdx, qword [r12 + H5aParser.tokenizer.char_ref]
     shl rdx, 4
-    sub di, 0x30
+    sub dil, 0x30
     add rdx, rdi
     mov qword [r12 + H5aParser.tokenizer.char_ref], rdx
     xor al,al
@@ -2566,7 +2563,7 @@ state hexadecimalCharacterReference,HEXADECIMAL_CHARACTER_REFERENCE_STATE
   [[ASCII upper hex digit]]
     mov rdx, qword [r12 + H5aParser.tokenizer.char_ref]
     shl rdx, 4
-    sub di, 0x37
+    sub dil, 0x37
     add rdx, rdi
     mov qword [r12 + H5aParser.tokenizer.char_ref], rdx
     xor al,al
@@ -2575,7 +2572,7 @@ state hexadecimalCharacterReference,HEXADECIMAL_CHARACTER_REFERENCE_STATE
   [[ASCII lower hex digit]]
     mov rdx, qword [r12 + H5aParser.tokenizer.char_ref]
     shl rdx, 4
-    sub di, 0x57
+    sub dil, 0x57
     add rdx, rdi
     mov qword [r12 + H5aParser.tokenizer.char_ref], rdx
     xor al,al
@@ -2602,7 +2599,7 @@ state decimalCharacterReference,DECIMAL_CHARACTER_REFERENCE_STATE
     xor rcx,rcx
     mov cl, 10
     mul rcx
-    sub di, 0x30
+    sub dil, 0x30
     add rax, rdi
     mov qword [r12 + H5aParser.tokenizer.char_ref], rax
     xor al,al
@@ -2624,14 +2621,12 @@ end state
 
 state numericCharacterReferenceEnd,NUMERIC_CHARACTER_REFERENCE_END_STATE
 
-  @NoConsume
+  @NoConsumeSingleCharacter
   @SpecialAction
 
-public numeric_resolve
-
-numeric_resolve:
+namespace numeric_resolve
 .start:
-  push r14 ;fix arity
+  push r14 ;char_ref_modified
   mov r14, qword [r12 + H5aParser.tokenizer.char_ref]
 
   test r14,r14
@@ -2679,6 +2674,7 @@ numeric_resolve:
   mov byte [r12 + H5aParser.tokenizer.state], cl
   pop r14
   ret
+end namespace
 
 end state
 

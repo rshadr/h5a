@@ -293,8 +293,7 @@ func _h5aTokenizerEmitTag, public
 ;; R12 (s): H5aParser *parser
 ;; -> void
   lea rdi, [r12 + H5aParser.tokenizer.tag]
-  ; XXX
-  ;movzx rsi, byte [r12 + H5aParser.tokeniz
+  movzx rsi, byte [r12 + H5aParser.tokenizer.tag_type]
   jmp _h5aTokenizerEmitToken
 end func
 
@@ -472,7 +471,7 @@ end func
 
 
 func _h5aTokenizerMain, public
-;; stack entry: [r12, RET]
+;; stack entry: [r12, API_RET]
 ;; R12 (omni:lost): H5aParser *
 ;; -> EAX: enum H5aResult
   push r13

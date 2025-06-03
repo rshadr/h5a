@@ -20,7 +20,6 @@ public _k_h5a_impliedTagsExt
 public _k_h5a_impliedTagsBasic.size
 public _k_h5a_impliedTagsExt.size
 
-public _h5aTreeBuilderAppendCommentToDocument
 public _h5aTreeBuilderInsertCharacterBuffer
 public _h5aTreeBuilderInsertCharacter
 public _h5aTreeBuilderGenerateImpliedEndTags
@@ -30,7 +29,19 @@ public _h5aTreeBuilderAcceptToken
 
 section '.text' executable
 
-_h5aTreeBuilderAppendCommentToDocument:
+func _h5aTreeBuilderAppendComment, public
+;; R12 (s): H5aParser *parser
+;; R15 (s): H5aSinkVTable *sink_vtable
+;; RDI (arg): H5aString *comment
+;; -> void
+  with_stack_frame
+    ; XXX: need stack of open elements first before continuing
+  end with_stack_frame
+  ret
+
+end func
+
+func _h5aTreeBuilderAppendCommentToDocument, public
 ;; R12 (s): H5aParser *parser
 ;; R15 (s): H5aSinkVTable *sink_vtable
 ;; RDI (arg): H5aString *comment
@@ -76,6 +87,7 @@ _h5aTreeBuilderAppendCommentToDocument:
 
   end with_stack_frame
   ret
+end func
 
 _h5aTreeBuilderGenericCommonParse:
 ;; -> void
@@ -89,15 +101,20 @@ _h5aTreeBuilderGenericCommonParse:
   end with_saved_regs
   ret
 
-_h5aTreeBuilderGenericRawTextParse:
+
+func _h5aTreeBuilderGenericRawTextParse, public
   xor rdi,rdi
   mov dil, RAWTEXT_STATE
   jmp _h5aTreeBuilderGenericCommonParse
+end func
 
-_h5aTreeBuilderGenericRcdataParse:
+
+func _h5aTreeBuilderGenericRcdataParse, public
   xor rdi,rdi
   mov dil, RCDATA_STATE
   jmp _h5aTreeBuilderGenericCommonParse
+end func
+
 
 _h5aTreeBuilderGenerateImpliedEndTags:
 ;; R12 (s): H5aParser *parser
