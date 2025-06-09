@@ -9,6 +9,10 @@ include "local.inc"
 
 format ELF64
 
+extrn _h5aAttrVectorCreate
+extrn _h5aAttrVectorDestroy
+extrn _h5aModeVectorCreate
+extrn _h5aModeVectorDestroy
 extrn _h5aStringCreate
 extrn _h5aStringDestroy
 extrn _h5aCharacterQueueConstruct
@@ -43,6 +47,9 @@ func h5aCreateParser, public
     lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
     call _h5aCharacterQueueConstruct
 
+    lea rdi, [r12 + H5aParser.treebuilder.template_modes]
+    call _h5aModeVectorCreate
+
     lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
     call _h5aStringCreate
     lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.public_id]
@@ -56,7 +63,8 @@ func h5aCreateParser, public
     lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
     call _h5aStringCreate
 
-    ; XXX: attributes
+    lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.attributes]
+    call _h5aAttrVectorCreate
 
   end with_saved_regs
   end with_stack_frame
@@ -74,10 +82,8 @@ func h5aDestroyParser, public
   with_saved_regs r12
     mov r12, rdi
 
-    lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
-    call _h5aCharacterQueueDestroy
-    lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
-    call _h5aCharacterQueueDestroy
+    lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.attributes]
+    call _h5aAttrVectorDestroy
 
     lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
     call _h5aStringDestroy
@@ -86,12 +92,22 @@ func h5aDestroyParser, public
     lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.system_id]
     call _h5aStringDestroy
 
+    lea rdi, [r12 + H5aParser.treebuilder.template_modes]
+    call _h5aModeVectorDestroy
+
     lea rdi, [r12 + H5aParser.tokenizer.comment]
     call _h5aStringDestroy
 
     lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
     call _h5aStringDestroy
 
+    ; ^ still need to be shuffled backwards
+
+    lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
+    call _h5aCharacterQueueDestroy
+
+    lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
+    call _h5aCharacterQueueDestroy
   end with_saved_regs
 
   mov eax, H5A_SUCCESS

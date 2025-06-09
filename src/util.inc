@@ -191,7 +191,7 @@ macro with_stack_frame?
 end macro
 
 
-calminstruction pick_me?
+calminstruction save_all_regs?
   asm push rax
   asm push rcx
   asm push rdx
@@ -210,73 +210,72 @@ calminstruction pick_me?
   asm push r15
 
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm0
+  asm vmovdqu64 [rsp], ymm0
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm1
+  asm vmovdqu64 [rsp], ymm1
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm2
+  asm vmovdqu64 [rsp], ymm2
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm3
+  asm vmovdqu64 [rsp], ymm3
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm4
+  asm vmovdqu64 [rsp], ymm4
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm5
+  asm vmovdqu64 [rsp], ymm5
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm6
+  asm vmovdqu64 [rsp], ymm6
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm7
+  asm vmovdqu64 [rsp], ymm7
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm8
+  asm vmovdqu64 [rsp], ymm8
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm9
+  asm vmovdqu64 [rsp], ymm9
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm10
+  asm vmovdqu64 [rsp], ymm10
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm11
+  asm vmovdqu64 [rsp], ymm11
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm12
+  asm vmovdqu64 [rsp], ymm12
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm13
+  asm vmovdqu64 [rsp], ymm13
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm14
+  asm vmovdqu64 [rsp], ymm14
   asm sub rsp, 32
-  asm vmovdqu [rsp], ymm15
+  asm vmovdqu64 [rsp], ymm15
+end calminstruction
 
 
-  ; XXX: ...
-
-
-  asm vmovdqu ymm15, [rsp]
+calminstruction load_all_regs?
+  asm vmovdqu64 ymm15, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm14, [rsp]
+  asm vmovdqu64 ymm14, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm13, [rsp]
+  asm vmovdqu64 ymm13, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm12, [rsp]
+  asm vmovdqu64 ymm12, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm11, [rsp]
+  asm vmovdqu64 ymm11, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm10, [rsp]
+  asm vmovdqu64 ymm10, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm9, [rsp]
+  asm vmovdqu64 ymm9, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm8, [rsp]
+  asm vmovdqu64 ymm8, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm7, [rsp]
+  asm vmovdqu64 ymm7, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm6, [rsp]
+  asm vmovdqu64 ymm6, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm5, [rsp]
+  asm vmovdqu64 ymm5, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm4, [rsp]
+  asm vmovdqu64 ymm4, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm3, [rsp]
+  asm vmovdqu64 ymm3, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm2, [rsp]
+  asm vmovdqu64 ymm2, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm1, [rsp]
+  asm vmovdqu64 ymm1, [rsp]
   asm add rsp, 32
-  asm vmovdqu ymm0, [rsp]
+  asm vmovdqu64 ymm0, [rsp]
   asm add rsp, 32
 
   asm pop r15

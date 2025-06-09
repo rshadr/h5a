@@ -17,11 +17,6 @@
 #include <grapheme.h>
 #include <h5a.h>
 
-struct hstring {
-  char *data;
-  uint32_t size;
-  uint32_t capacity;
-};
 
 typedef struct MdInputStream_s {
   char const *p;
@@ -32,6 +27,10 @@ typedef struct MdInputStream_s {
   size_t file_size;
 
   size_t read_counter;
+
+  /* infos for tracing */
+  size_t line;
+  size_t col;
 } MdInputStream;
 
 typedef struct MdControlBlock_s {
@@ -79,15 +78,15 @@ struct MdHandle_s {
  * Weak handles need to be locked into a strong handle before use
  */
 typedef struct MdWeakHandle_s {
-  void *x;
-  void *y;
+  void *instance;
+  MdControlBlock *control_block;
 } MdWeakHandle;
 #define MdWeakHandle(t) \
   MdWeakHandle
 
 typedef struct MdNode_s {
   MdHandleVector(MdNode) child_nodes;
-  MdWeakHandle(MdNode) parent;
+  MdWeakHandle(MdNode) parent_node;
   MdNodeType node_type;
 } MdNode;
 
@@ -144,6 +143,7 @@ static char32_t mdInputStreamGetChar (void *user_data);
 [[nodiscard]] static inline H5aHandle mdMdHandleToH5a (MdHandle handle);
 [[nodiscard]] static inline MdHandle mdH5aHandleToMd (H5aHandle handle);
 [[nodiscard]] static inline MdHandle mdHandleClone (MdHandle handle);
+[[nodiscard]] static inline MdWeakHandle mdHandleWeakClone (MdHandle handle);
 static void mdHandleDestroy (MdHandle handle);
 
 [[nodiscard]] static MdHandle mdInstanceAllocate (size_t size, void (*dtor) (void *));
@@ -168,6 +168,120 @@ static void mdSinkRemoveFromParent (H5aSink *self, H5aHandle target);
 static void mdSinkReparentChildren (H5aSink *self, H5aHandle node, H5aHandle new_parent);
 static H5aTag mdSinkGetTagByName (H5aSink *self, H5aStringView name);
 static void mdSinkDestroyHandle (H5aSink *self, H5aHandle handle);
+
+static char const *k_html_tags_table[NUM_H5A_TAGS] = {
+  [H5A_TAG_HTML] = "html",
+
+  [H5A_TAG_HEAD]  = "head",
+  [H5A_TAG_TITLE] = "title",
+  [H5A_TAG_BASE]  = "base",
+  [H5A_TAG_LINK]  = "link",
+  [H5A_TAG_META]  = "meta",
+  [H5A_TAG_STYLE] = "style",
+
+  [H5A_TAG_BODY]    = "body",
+  [H5A_TAG_ARTICLE] = "article",
+  [H5A_TAG_SECTION] = "section",
+  [H5A_TAG_NAV]     = "nav",
+  [H5A_TAG_ASIDE]   = "aside",
+  [H5A_TAG_H1]      = "h1",
+  [H5A_TAG_H2]      = "h2",
+  [H5A_TAG_H3]      = "h3",
+  [H5A_TAG_H4]      = "h4",
+  [H5A_TAG_H5]      = "h5",
+  [H5A_TAG_H6]      = "h6",
+  [H5A_TAG_HGROUP]  = "hgroup",
+  [H5A_TAG_HEADER]  = "header",
+  [H5A_TAG_FOOTER]  = "footer",
+  [H5A_TAG_ADDRESS] = "address",
+
+  [H5A_TAG_P] = "p",
+  [H5A_TAG_HR] = "hr",
+  [H5A_TAG_PRE] = "pre",
+  [H5A_TAG_BLOCKQUOTE] = "blockquote",
+  [H5A_TAG_OL] = "ol",
+  [H5A_TAG_UL] = "ul",
+  [H5A_TAG_MENU] = "menu",
+  [H5A_TAG_LI] = "li",
+  [H5A_TAG_DL] = "dl",
+  [H5A_TAG_DT] = "dt",
+  [H5A_TAG_DD] = "dd",
+  [H5A_TAG_FIGURE] = "figure",
+  [H5A_TAG_FIGCAPTION] = "figcaption",
+  [H5A_TAG_MAIN] = "main",
+  [H5A_TAG_SEARCH] = "search",
+  [H5A_TAG_DIV] = "div",
+
+  [H5A_TAG_A] = "a",
+  [H5A_TAG_EM] = "em",
+  [H5A_TAG_STRONG] = "strong",
+  [H5A_TAG_SMALL] = "small",
+  [H5A_TAG_S] = "s",
+  [H5A_TAG_CITE] = "cite",
+  [H5A_TAG_Q] = "q",
+  [H5A_TAG_DFN] = "dfn",
+  [H5A_TAG_ABBR] = "abbr",
+  [H5A_TAG_RUBY] = "ruby",
+  [H5A_TAG_RT] = "rt",
+  [H5A_TAG_RP] = "rp",
+  [H5A_TAG_DATA] = "data",
+  [H5A_TAG_TIME] = "time",
+  [H5A_TAG_CODE] = "code",
+  [H5A_TAG_VAR] = "var",
+  [H5A_TAG_SAMP] = "samp",
+  [H5A_TAG_KBD] = "kbd",
+  [H5A_TAG_SUB] = "sub",
+  [H5A_TAG_SUP] = "sup",
+  [H5A_TAG_I] = "i",
+  [H5A_TAG_B] = "b",
+  [H5A_TAG_U] = "u",
+  [H5A_TAG_MARK] = "mark",
+  [H5A_TAG_BDI] = "bdi",
+  [H5A_TAG_BDO] = "bdo",
+  [H5A_TAG_SPAN] = "span",
+  [H5A_TAG_BR] = "br",
+  [H5A_TAG_WBR] = "wbr",
+
+  /* ... */
+
+  
+
+  [H5A_TAG_SCRIPT]   = "script",
+  [H5A_TAG_NOSCRIPT] = "noscript",
+  [H5A_TAG_TEMPLATE] = "template",
+  [H5A_TAG_SLOT]     = "slot",
+  [H5A_TAG_CANVAS]   = "canvas",
+
+  [H5A_TAG_APPLET]   = "applet",
+  [H5A_TAG_ACRONYM]  = "acronym",
+  [H5A_TAG_BGSOUND]  = "bgsound",
+  [H5A_TAG_DIR]      = "dir",
+  [H5A_TAG_FRAME]    = "frame",
+  [H5A_TAG_FRAMESET] = "frameset",
+  [H5A_TAG_NOFRAMES] = "noframes",
+  [H5A_TAG_ISINDEX]  = "isindex",
+  [H5A_TAG_KEYGEN]   = "keygen",
+  [H5A_TAG_LISTING]  = "listing",
+  [H5A_TAG_MENUITEM] = "menuitem",
+  [H5A_TAG_NEXTID]    = "nextid",
+  [H5A_TAG_NOEMBED]   = "noembed",
+  [H5A_TAG_PARAM]     = "param",
+  [H5A_TAG_PLAINTEXT] = "plaintext",
+  [H5A_TAG_RB]        = "rb",
+  [H5A_TAG_RTC]       = "rtc",
+  [H5A_TAG_STRIKE]    = "strike",
+  [H5A_TAG_XMP]       = "xmp",
+  [H5A_TAG_BASEFONT]  = "basefont",
+  [H5A_TAG_BIG]       = "big",
+  [H5A_TAG_BLINK]     = "blink",
+  [H5A_TAG_CENTER]    = "center",
+  [H5A_TAG_FONT]      = "font",
+  [H5A_TAG_MARQUEE]   = "marquee",
+  [H5A_TAG_MULTICOL]  = "multicol",
+  [H5A_TAG_NOBR]      = "nobr",
+  [H5A_TAG_SPACER]    = "spacer",
+  [H5A_TAG_TT]        = "tt",
+};
 
 static const H5aSinkVTable k_minidom_sink_vtable = {
   .finish = mdSinkFinish,
@@ -243,6 +357,8 @@ mdInputStreamCreate (MdInputStream *stream, char const *file_name)
     .file_data = file_data,
     .file_size = file_size,
     .file_name = file_name,
+    .line = 1,
+    .col  = 1,
   };
 
 }
@@ -276,6 +392,13 @@ mdInputStreamGetChar (void *user_data)
    || !(read = grapheme_decode_utf8(stream->p,
                 left, (uint_least32_t *)(&c))))
     return eof;
+
+  // XXX: windows
+  if (c == '\n') {
+    stream->line += 1;
+    stream->col = 1;
+    printf("reached line %zu\n", stream->line);
+  }
 
   stream->read_counter += 1;
   stream->p += read;
@@ -311,6 +434,17 @@ mdHandleClone (MdHandle handle)
 {
   ++handle.control_block->ref_count;
   return handle;
+}
+
+
+[[nodiscard]]
+static inline MdWeakHandle
+mdHandleWeakClone (MdHandle handle)
+{
+  return (MdWeakHandle) {
+    .instance = handle.instance,
+    .control_block = handle.control_block
+  };
 }
 
 
@@ -542,6 +676,7 @@ mdSinkSameNode (H5aSink *self, H5aHandle x, H5aHandle y)
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 static H5aHandle
 mdSinkCreateComment (H5aSink *self, H5aStringView text)
 {
@@ -549,6 +684,8 @@ mdSinkCreateComment (H5aSink *self, H5aStringView text)
 
   auto handle = MD_ALLOC(Comment);
   MdComment *comment = handle.instance;
+
+  printf("i'm commenting it rn\n");
 
   mdNode_ctor((MdNode *)(comment), MD_NODETYPE_COMMENT);
   comment->content = strndup(text.data, text.size);
@@ -561,16 +698,16 @@ H5A_SINK_CALLBACK_ATTR
 static void
 mdSinkAppend (H5aSink *self, H5aHandle parent, H5A_NODE_OR_TEXT_HANDLE(child))
 {
-  abort();
-  (void) self;
-  (void) parent;
-  (void) child;
-  (void) child_is_string;
-
-  if (! child_is_string ) {
-  } else {
+  if (child_is_string)
     abort();
-  }
+
+  auto parent_handle = mdH5aHandleToMd(parent);
+  auto child_handle  = mdH5aHandleToMd(child.handle);
+  MdNode *parent_node = parent_handle.instance;
+  MdNode *child_node  = child_handle.instance;
+
+  child_node->parent_node = mdHandleWeakClone(parent_handle);
+  mdHandleVectorPush(&parent_node->child_nodes, child_handle);
 }
 
 
@@ -590,9 +727,10 @@ mdSinkAppendDoctypeToDocument (H5aSink *self,
 	auto document = (MdDocument *)(document_handle.instance);
 
 	auto doctype_handle = MD_ALLOC(Doctype);
-  mdDoctype_ctor((MdDoctype *)(doctype_handle.instance),
-    name, public_id, system_id);
+  MdDoctype *doctype = doctype_handle.instance;
+  mdDoctype_ctor(doctype, name, public_id, system_id);
 
+  ((MdNode *)(doctype))->parent_node = mdHandleWeakClone(document_handle);
 	mdHandleVectorPush(&((MdNode *)document)->child_nodes, doctype_handle);
 
 	mdHandleDestroy(doctype_handle);
@@ -624,8 +762,12 @@ static H5aTag
 mdSinkGetTagByName (H5aSink *self, H5aStringView name)
 {
   (void) self;
-  (void) name;
-  abort();
+
+  for (H5aTag t = 0; t < NUM_H5A_TAGS; ++t)
+    if (k_html_tags_table[t] != NULL
+     && strcmp(k_html_tags_table[t], name.data) == 0)
+      return t;
+
   return H5A_PLACEHOLDER_TAG;
 }
 
@@ -648,7 +790,7 @@ main (int argc, char *argv[])
 
   char const *file_name = argv[1];
   MdInputStream stream = { 0 };
-  uint8_t parser_mem[k_h5a_parserSize];
+  alignas(size_t) uint8_t parser_mem[k_h5a_parserSize];
   H5aParser *parser = (H5aParser *)(parser_mem);
 
   MdSink sink = { 0 };

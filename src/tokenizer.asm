@@ -7,10 +7,25 @@ include 'macro/struct.inc'
 include "util.inc"
 include "local.inc"
 
+
+calminstruction tokenizer_trace?
+;; AL contains status
+  ;asm with_stack_frame
+  ;asm save_all_regs
+
+  ; ...
+
+  ;asm load_all_regs
+  ;asm end with_stack_frame
+end calminstruction
+
+
 format ELF64
 
 
 extrn _h5aStringClear
+extrn _h5aAttrVectorClear
+extrn _h5aAttrVectorPushSlot
 extrn _h5aCharacterQueuePushBack
 extrn _h5aCharacterQueuePopFront
 extrn _h5aCharacterQueueSubscript
@@ -205,7 +220,10 @@ func _h5aTokenizerCreateTag, private
     mov byte [r12 + H5aParser.tokenizer.tag_type], dil
     lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
     call _h5aStringClear
-    ; XXX: clear attributes
+
+    lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.attributes]
+    call _h5aAttrVectorClear
+
     xor al,al
     mov byte [r12 + H5aParser.tokenizer.tag + TagToken.self_closing_flag], al
     mov byte [r12 + H5aParser.tokenizer.tag + TagToken.acknowledged_self_closing_flag], al
@@ -229,7 +247,11 @@ end func
 
 
 func _h5aTokenizerStartAttribute, public
-; XXX ...
+  with_stack_frame
+    lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.attributes]
+    call _h5aAttrVectorPushSlot
+    mov qword [r12 + H5aParser.tokenizer.cur_attr], rax
+  end with_stack_frame
   ret
 end func
 
@@ -543,6 +565,8 @@ func _h5aTokenizerMain, public
       mov    rdi, r13
       call   rax
 
+      tokenizer_trace
+
       test al, RESULT_BIT_AGAIN
       jnz .charLoop.asciiLoop
       test al, RESULT_BIT_LEAVE
@@ -555,11 +579,12 @@ func _h5aTokenizerMain, public
       cmp r13d, (not 0x00)
       likely je .exit
 
-      xor rax,rax
-      mov al, byte [r12 + H5aParser.tokenizer.state]
-      mov rax, qword [rbx + rax * 8]
-      mov rdi, r10
-      call rax
+      movzx  rax, byte [r12 + H5aParser.tokenizer.state]
+      mov    rax, qword [rbx + rax * 8]
+      mov    rdi, r10
+      call   rax
+
+      tokenizer_trace
 
       test al, RESULT_BIT_AGAIN
       jnz .charLoop.unicodeOrEofLoop

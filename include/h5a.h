@@ -342,6 +342,22 @@ H5aResult h5aCreateParser (H5aParserCreateInfo const *create_info,
 H5aResult h5aDestroyParser (H5aParser *parser);
 H5aResult h5aResumeParser (H5aParser *parser);
 
+#if (H5A_ENABLE_DEBUG == 1)
+
+typedef struct H5aVector_s {
+  void *    data;
+  uint32_t  size;
+  uint32_t  capacity;
+} H5aVector;
+
+typedef struct H5aString_s {
+  char *    data;
+  uint32_t  size;
+  uint32_t  capacity;
+} H5aString;
+
+#endif
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

@@ -63,25 +63,25 @@ func _h5aTreeBuilderAppendCommentToDocument, public
     push rdx
 
     ; document handle
-    mov rsi, qword [rbp - 2 * 8]
-    mov rdx, qword [rbp - 3 * 8]
+    mov rsi, qword [rbp - 3 * 8]
+    mov rdx, qword [rbp - 4 * 8]
     ; child (comment) handle
-    mov rcx, qword [rbp - 0 * 8]
-    mov r8,  qword [rbp - 1 * 8]
+    mov rcx, qword [rbp - 1 * 8]
+    mov r8,  qword [rbp - 2 * 8]
     xor r9,r9
-
+    ; sink
     mov rdi, qword [r12 + H5aParser.sink.user_data]
     call qword [r15 + H5aSinkVTable.append]
 
 
     ;; destroy handles
-    mov rsi, qword [rbp - 2 * 8]
-    mov rdx, qword [rbp - 3 * 8]
+    mov rsi, qword [rbp - 3 * 8]
+    mov rdx, qword [rbp - 4 * 8]
     mov rdi, qword [r12 + H5aParser.sink.user_data]
     call qword [r15 + H5aSinkVTable.destroy_handle]
 
-    mov rsi, qword [rbp - 0 * 8]
-    mov rdx, qword [rbp - 1 * 8]
+    mov rsi, qword [rbp - 1 * 8]
+    mov rdx, qword [rbp - 2 * 8]
     mov rdi, qword [r12 + H5aParser.sink.user_data]
     call qword [r15 + H5aSinkVTable.destroy_handle]
 

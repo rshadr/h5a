@@ -1,8 +1,13 @@
+struct H5aVector
+  data      dq ?
+  size      dd ?
+  capacity  dd ?
+ends
 
 struct H5aString
-  data     dq ?
-  size     dd ?
-  capacity dd ?
+  data      dq ?
+  size      dd ?
+  capacity  dd ?
 ends
 
 struct H5aCharacterQueue
@@ -30,33 +35,42 @@ ends
 
 struct TagToken
   name                            rb sizeof.H5aString
-  ; XXX: attributes
+  attributes                      rb sizeof.H5aVector
   self_closing_flag               db ?
   acknowledged_self_closing_flag  db ?
 ends
 
 struct H5aParser
-  input_stream.get_char_cb  dq ?
-  input_stream.user_data    dq ?
-  sink.vtable               dq ?
-  sink.user_data            dq ?
+  input_stream.get_char_cb    dq ?
+  input_stream.user_data      dq ?
+  sink.vtable                 dq ?
+  sink.user_data              dq ?
 
-  tokenizer.char_ref        dq ?
-  tokenizer.input_buffer    rb sizeof.H5aCharacterQueue
-  tokenizer.temp_buffer     rb sizeof.H5aCharacterQueue
-  tokenizer.comment         rb sizeof.H5aString
-  tokenizer.doctype         rb sizeof.DoctypeToken
-  tokenizer.tag             rb sizeof.TagToken
-  tokenizer.newline_count   dw ?
+  tokenizer.char_ref          dq ?
+  tokenizer.cur_attr          dq ?
+  tokenizer.input_buffer      rb sizeof.H5aCharacterQueue
+  tokenizer.temp_buffer       rb sizeof.H5aCharacterQueue
 
-  tokenizer.state           db ?
-  tokenizer.return_state    db ?
-  treebuilder.mode          db ?
-  treebuilder.original_mode db ?
-  tokenizer.tag_type        db ?
+  treebuilder.template_modes  rb sizeof.H5aVector
+  treebuilder.element_stack   rb sizeof.H5aVector
 
-  tokenizer.saw_cr          db ?
-  tokenizer.saw_eof         db ?
+  tokenizer.comment           rb sizeof.H5aString
+  tokenizer.doctype           rb sizeof.DoctypeToken
+
+  tokenizer.tag               rb sizeof.TagToken
+  tokenizer.newline_count     dw ?
+
+  tokenizer.state             db ?
+  tokenizer.return_state      db ?
+  treebuilder.mode            db ?
+  treebuilder.original_mode   db ?
+  tokenizer.tag_type          db ?
+
+  flags.foster_parenting      db ?
+  flags.scripting             db ?
+
+  tokenizer.saw_cr            db ?
+  tokenizer.saw_eof           db ?
 ends
 
 enum
@@ -168,6 +182,9 @@ enum
   AFTER_FRAMESET_MODE
   AFTER_AFTER_BODY_MODE
   AFTER_AFTER_FRAMESET_MODE
+
+  IN_FOREIGN_CONTENT_MODE
+
   NUM_MODES
 end enum
 

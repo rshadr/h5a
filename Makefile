@@ -14,11 +14,11 @@ SOURCES =\
 	entities\
 	insertion_modes\
 	parser\
-	string\
 	tokenizer\
 	tokenizer_states\
 	treebuilder\
-	unicode
+	unicode\
+	vectors
 
 OBJS = $(patsubst %, build/%.o, $(SOURCES))
 
@@ -36,6 +36,8 @@ build/tokenizer_states.o: src/tokenizer_states.asm \
 	src/tokenizer_states.g src/local.inc src/util.inc
 build/treebuilder.o: src/treebuilder.asm \
 	src/local.inc src/util.inc
+build/vectors.o: src/vectors.asm \
+  src/util.inc src/local.inc
 
 TESTS =\
 	character_queue\

@@ -1888,9 +1888,11 @@ end state
 state comment,COMMENT_STATE
 
   [[U+003C LESS-THAN SIGN]]
+label tux
+public tux
     with_stack_frame
-      lea rdi, [r12 + H5aParser.tokenizer.comment]
       mov rsi, r13
+      lea rdi, [r12 + H5aParser.tokenizer.comment]
       call _h5aStringPushBackAscii
       mov byte [r12 + H5aParser.tokenizer.state], COMMENT_LESS_THAN_SIGN_STATE
     end with_stack_frame
@@ -2072,12 +2074,12 @@ state commentEnd,COMMENT_END_STATE
 
   [[Anything else]]
     with_stack_frame
-      repeat 2
+      iterate cp, '-','-'
         xor rsi,rsi
-        mov sil, '-'
+        mov sil, cp
         lea rdi, [r12 + H5aParser.tokenizer.comment]
         call _h5aStringPushBackAscii
-      end repeat
+      end iterate
       mov byte [r12 + H5aParser.tokenizer.state], COMMENT_STATE
     end with_stack_frame
     mov al, RESULT_RECONSUME
@@ -2193,10 +2195,12 @@ state beforeDoctypeName,BEFORE_DOCTYPE_NAME_STATE
     with_stack_frame
       token_error! unexpected_null_character
       call _h5aTokenizerCreateDoctype
+
       lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
       xor rsi,rsi
       mov si, 0xFFFD
       call _h5aStringPushBackUnicode
+
       mov byte [r12 + H5aParser.tokenizer.state], DOCTYPE_NAME_STATE
     end with_stack_frame
     xor al,al
@@ -2206,8 +2210,10 @@ state beforeDoctypeName,BEFORE_DOCTYPE_NAME_STATE
     with_stack_frame
       token_error! missing_doctype_name
       call _h5aTokenizerCreateDoctype
+
       mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x1
       mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+
       call _h5aTokenizerEmitDoctype
     end with_stack_frame
     xor al,al
@@ -2315,8 +2321,10 @@ state afterDoctypeName,AFTER_DOCTYPE_NAME_STATE
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
-    call _h5aTokenizerEmitDoctype
+    with_stack_frame
+      mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
     xor al,al
     ret
 
@@ -2372,23 +2380,130 @@ state afterDoctypePublicKeyword,AFTER_DOCTYPE_PUBLIC_KEYWORD_STATE
 end state
 
 
-;; ...
+; ...
 
-state bogusDoctype,BOGUS_DOCTYPE_STATE
 
-  [[U+003E GREATER-THAN SIGN]]
-    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
-    ;; emit
+state doctypeSystemIdentifierDoubleQuoted,DOCTYPE_SYSTEM_IDENTIFIER_DOUBLE_QUOTED_STATE
+
+  ; ...
+
+  [[Anything else]]
+    with_stack_frame
+      lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.system_id]
+      mov rsi, r13
+      call _h5aStringPushBackUnicode
+    end with_stack_frame
+    xor al,al
+    ret
+
+end state
+
+
+state doctypeSystemIdentifierSingleQuoted,DOCTYPE_SYSTEM_IDENTIFIER_SINGLE_QUOTED_STATE
+
+  [[U+0027 APOSTROPHE]]
+    mov byte [r12 + H5aParser.tokenizer.state], AFTER_DOCTYPE_SYSTEM_IDENTIFIER_STATE
     xor al,al
     ret
 
   [[U+0000 NULL]]
-    ;; ...
+    with_stack_frame
+      token_error! unexpected_null_character
+      lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.system_id]
+      xor rsi,rsi
+      mov di, 0xFFFD
+      call _h5aStringPushBackUnicode
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    with_stack_frame
+      token_error! abrupt_doctype_system_identifier
+      mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x1
+      mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[EOF]]
+    with_stack_frame
+      token_error! eof_in_doctype
+      mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x1
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
+    jmp _h5aTokenizerEmitDoctype
+
+  [[Anything else]]
+    with_stack_frame
+      lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.system_id]
+      mov rsi, r13
+      call _h5aStringPushBackUnicode
+    end with_stack_frame
+    xor al,al
+    ret
+
+end state
+
+
+state afterDoctypeSystemIdentifier,AFTER_DOCTYPE_SYSTEM_IDENTIFIER_STATE
+
+  [[U+0009 CHARACTER TABULATION]]
+  [[U+000A LINE FEED]]
+  [[U+000C FORM FEED]]
+  [[U+0020 SPACE]]
+    mov al, RESULT_IGNORE
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    with_stack_frame
+      mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[EOF]]
+    with_stack_frame
+      token_error! eof_in_doctype
+      mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x1
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
+    jmp _h5aTokenizerEmitEof
+
+  [[Anything else]]
+    with_stack_frame
+      token_error! unexpected_character_after_doctype_system_identifier
+      mov byte [r12 + H5aParser.tokenizer.state], BOGUS_DOCTYPE_STATE
+    end with_stack_frame
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state bogusDoctype,BOGUS_DOCTYPE_STATE
+
+  [[U+003E GREATER-THAN SIGN]]
+    with_stack_frame
+      mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[U+0000 NULL]]
+    with_stack_frame
+      token_error! unexpected_null_character
+    end with_stack_frame
     mov al, RESULT_IGNORE
     ret
 
   [[EOF]]
-    ;; ...
+    with_stack_frame
+      call _h5aTokenizerEmitDoctype
+    end with_stack_frame
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
@@ -2397,7 +2512,77 @@ state bogusDoctype,BOGUS_DOCTYPE_STATE
 
 end state
 
-;; ...
+
+state cdataSection,CDATA_SECTION_STATE
+
+  [[U+005D RIGHT SQUARE BRACKET]]
+    mov byte [r12 + H5aParser.tokenizer.state], CDATA_SECTION_BRACKET_STATE
+    ret
+
+  [[EOF]]
+    with_stack_frame
+      token_error! eof_in_cdata
+    end with_stack_frame
+
+  [[Anything else]]
+    with_stack_frame
+      call _h5aTokenizerEmitCharacter
+    end with_stack_frame
+    xor al,al
+    ret
+end state
+
+
+state cdataSectionBracket,CDATA_SECTION_BRACKET_STATE
+
+  [[U+005D RIGHT SQUARE BRACKET]]
+    mov byte [r12 + H5aParser.tokenizer.state], CDATA_SECTION_END_STATE
+    ret
+
+  [[Anything else]]
+    with_stack_frame
+      xor rdi,rdi
+      mov dil, ']'
+      call _h5aTokenizerEmitCharacter
+
+      mov byte [r12 + H5aParser.tokenizer.state], CDATA_SECTION_STATE
+    end with_stack_frame
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
+
+state cdataSectionEnd,CDATA_SECTION_END_STATE
+
+  [[U+005D RIGHT SQUARE BRACKET]]
+    with_stack_frame
+      xor rdi,rdi
+      mov dil, ']'
+      call _h5aTokenizerEmitCharacter
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[U+003E GREATER-THAN SIGN]]
+    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+    ret
+
+  [[Anything else]]
+    with_stack_frame
+      iterate cp, ']',']'
+        xor rdi,rdi
+        mov dil, cp
+        call _h5aTokenizerEmitCharacter
+      end iterate
+
+      mov byte [r12 + H5aParser.tokenizer.state], CDATA_SECTION_STATE
+    end with_stack_frame
+    mov al, RESULT_RECONSUME
+    ret
+
+end state
+
 
 state characterReference,CHARACTER_REFERENCE_STATE
 
@@ -2405,6 +2590,7 @@ state characterReference,CHARACTER_REFERENCE_STATE
   with_stack_frame
     lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
     call _h5aCharacterQueueClear
+
     lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
     xor rsi,rsi
     mov sil, '&'
