@@ -6,6 +6,7 @@ include 'align.inc'
 include 'macro/struct.inc'
 include "util.inc"
 include "local.inc"
+include "tags.inc"
 
 
 calminstruction tokenizer_trace?
@@ -24,6 +25,8 @@ format ELF64
 
 
 extrn _h5aStringClear
+extrn _h5aAttrViewVectorClear
+extrn _h5aAttrViewVectorGenerate
 extrn _h5aAttrVectorClear
 extrn _h5aAttrVectorPushSlot
 extrn _h5aCharacterQueuePushBack
@@ -190,13 +193,17 @@ func _h5aTokenizerCreateDoctype, public
   with_stack_frame
     lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.name]
     call _h5aStringClear
+
     lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.public_id]
     call _h5aStringClear
+
     lea rdi, [r12 + H5aParser.tokenizer.doctype + DoctypeToken.system_id]
     call _h5aStringClear
-    mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.have_public_id], 0x00
-    mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.have_system_id], 0x00
-    mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], 0x00
+
+    xor al,al
+    mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.have_public_id], al
+    mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.have_system_id], al
+    mov byte [r12 + H5aParser.tokenizer.doctype + DoctypeToken.force_quirks_flag], al
   end with_stack_frame
   ret
 end func
@@ -204,6 +211,7 @@ end func
 
 func _h5aTokenizerCreateComment, public
 ;; R12 (s): H5aParser *parser
+;; -> void
   with_stack_frame
     lea rdi, [r12 + H5aParser.tokenizer.comment]
     call _h5aStringClear
@@ -218,15 +226,21 @@ func _h5aTokenizerCreateTag, private
 ;; -> void
   with_stack_frame
     mov byte [r12 + H5aParser.tokenizer.tag_type], dil
+
     lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
     call _h5aStringClear
 
     lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.attributes]
     call _h5aAttrVectorClear
 
+    lea rdi, [r12 + H5aParser.tokenizer.attr_views]
+    call _h5aAttrViewVectorClear
+
     xor al,al
     mov byte [r12 + H5aParser.tokenizer.tag + TagToken.self_closing_flag], al
     mov byte [r12 + H5aParser.tokenizer.tag + TagToken.acknowledged_self_closing_flag], al
+
+    mov dword [r12 + H5aParser.tokenizer.tag + TagToken.tag_index], H5A_PLACEHOLDER_TAG
   end with_stack_frame
   ret
 end func
@@ -314,8 +328,26 @@ end func
 func _h5aTokenizerEmitTag, public
 ;; R12 (s): H5aParser *parser
 ;; -> void
-  lea rdi, [r12 + H5aParser.tokenizer.tag]
-  movzx rsi, byte [r12 + H5aParser.tokenizer.tag_type]
+  with_stack_frame
+if 0
+    lea rdi, [r12 + H5aParser.tokenizer.attr_views]
+    lea rsi, [r12 + H5aParser.tokenizer.tag + TagToken.attributes]
+    call _h5aAttrViewVectorGenerate
+end if
+
+    mov rdi, qword [r12 + H5aParser.sink.user_data]
+    mov rsi, qword [r12 + H5aParser.tokenizer.tag + TagToken.name + H5aString.data]
+    xor rdx,rdx
+    mov edx, dword [r12 + H5aParser.tokenizer.tag + TagToken.name + H5aString.size]
+    mov rax, qword [r12 + H5aParser.sink.vtable]
+    call qword [rax + H5aSinkVTable.get_tag_by_name]
+
+    mov dword [r12 + H5aParser.tokenizer.tag + TagToken.tag_index], eax
+
+    lea rdi, [r12 + H5aParser.tokenizer.tag]
+    movzx rsi, byte [r12 + H5aParser.tokenizer.tag_type]
+
+  end with_stack_frame
   jmp _h5aTokenizerEmitToken
 end func
 
@@ -398,6 +430,10 @@ func _h5aTokenizerPrefetchChars, public
 ;; RDI (a): u32 count
 ;; -> bool have_that_many
 
+;; WARNING: the following input normalization has not been tested.
+;; It's been luckily working so far due to the absence of CARRIAGE RETURN
+;; in usual Unix files.
+
   mov al, byte [r12 + H5aParser.tokenizer.saw_eof]
   test al,al
   likely jz .inputLeft
@@ -407,7 +443,6 @@ func _h5aTokenizerPrefetchChars, public
 
 .inputLeft:
 
-  push rcx ;stack-align
   push rbx ;count store
   push rdx ;char store
   push r13 ;zero store
@@ -433,7 +468,7 @@ func _h5aTokenizerPrefetchChars, public
   jz .noWaitingCarriage
 
   with_saved_regs rdx, rcx
-    ; also push RCX for stack-align
+    ;rcx for align
     lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
     xor rsi,rsi
     mov sil, 0x0A
@@ -468,7 +503,6 @@ func _h5aTokenizerPrefetchChars, public
   pop r13
   pop rdx
   pop rbx
-  pop rcx ;stack-align
   ret
 
 .noEof:

@@ -9,6 +9,10 @@ include "local.inc"
 
 format ELF64
 
+extrn _h5aElementVectorCreate
+extrn _h5aElementVectorDestroy
+extrn _h5aAttrViewVectorCreate
+extrn _h5aAttrViewVectorDestroy
 extrn _h5aAttrVectorCreate
 extrn _h5aAttrVectorDestroy
 extrn _h5aModeVectorCreate
@@ -66,6 +70,12 @@ func h5aCreateParser, public
     lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.attributes]
     call _h5aAttrVectorCreate
 
+    lea rdi, [r12 + H5aParser.tokenizer.attr_views]
+    call _h5aAttrViewVectorCreate
+
+    lea rdi, [r12 + H5aParser.treebuilder.element_stack]
+    call _h5aElementVectorCreate
+
   end with_saved_regs
   end with_stack_frame
 
@@ -81,6 +91,12 @@ func h5aDestroyParser, public
 ;; RDI: H5aParser *parser
   with_saved_regs r12
     mov r12, rdi
+
+    lea rdi, [r12 + H5aParser.treebuilder.element_stack]
+    call _h5aElementVectorDestroy
+
+    lea rdi, [r12 + H5aParser.tokenizer.attr_views]
+    call _h5aAttrViewVectorDestroy
 
     lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.attributes]
     call _h5aAttrVectorDestroy

@@ -149,8 +149,8 @@ _h5aTreeBuilderInsertCharacter:
 ;; -> void
   with_stack_frame
     sub rsp, 16
-    mov qword [rbp - 0], rdi
-    lea rdi, [rbp - 0]
+    mov qword [rbp - 16], rdi
+    lea rdi, [rbp - 16]
     xor rsi,rsi
     mov sil, 1
     call _h5aTreeBuilderInsertCharacterBuffer

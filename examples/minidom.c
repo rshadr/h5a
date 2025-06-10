@@ -168,6 +168,7 @@ static void mdSinkRemoveFromParent (H5aSink *self, H5aHandle target);
 static void mdSinkReparentChildren (H5aSink *self, H5aHandle node, H5aHandle new_parent);
 static H5aTag mdSinkGetTagByName (H5aSink *self, H5aStringView name);
 static void mdSinkDestroyHandle (H5aSink *self, H5aHandle handle);
+[[nodiscard]] static H5aHandle mdSinkCloneHandle (H5aSink *self, H5aHandle handle);
 
 static char const *k_html_tags_table[NUM_H5A_TAGS] = {
   [H5A_TAG_HTML] = "html",
@@ -305,6 +306,7 @@ static const H5aSinkVTable k_minidom_sink_vtable = {
 
   .get_tag_by_name = mdSinkGetTagByName,
   .destroy_handle = mdSinkDestroyHandle,
+  .clone_handle = mdSinkCloneHandle,
 };
 
 
@@ -618,6 +620,7 @@ mdSinkDestroy (MdSink *sink)
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 static void *
 mdSinkFinish (H5aSink *self)
 {
@@ -627,6 +630,7 @@ mdSinkFinish (H5aSink *self)
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 static void
 mdSinkParseError (H5aSink *self, char const *msg)
 {
@@ -635,6 +639,7 @@ mdSinkParseError (H5aSink *self, char const *msg)
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 [[nodiscard]]
 static H5aHandle
 mdSinkGetDocument (H5aSink *self)
@@ -644,6 +649,7 @@ mdSinkGetDocument (H5aSink *self)
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 [[nodiscard]]
 static H5aHandle
 mdSinkGetTemplateContents (H5aSink *self, H5aHandle target)
@@ -656,6 +662,7 @@ mdSinkGetTemplateContents (H5aSink *self, H5aHandle target)
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 static void
 mdSinkSetQuirksMode (H5aSink *self, H5aQuirksMode mode)
 {
@@ -664,6 +671,7 @@ mdSinkSetQuirksMode (H5aSink *self, H5aQuirksMode mode)
 }
 
 
+H5A_SINK_CALLBACK_ATTR
 static bool
 mdSinkSameNode (H5aSink *self, H5aHandle x, H5aHandle y)
 {
@@ -779,6 +787,16 @@ mdSinkDestroyHandle (H5aSink *self, H5aHandle handle)
   (void) self;
 
   mdHandleDestroy( mdH5aHandleToMd(handle) );
+}
+
+
+H5A_SINK_CALLBACK_ATTR
+[[nodiscard]]
+static H5aHandle
+mdSinkCloneHandle (H5aSink *self, H5aHandle handle)
+{
+  (void) self;
+  return mdMdHandleToH5a( mdHandleClone( mdH5aHandleToMd(handle) ) );
 }
 
 

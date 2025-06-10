@@ -1374,9 +1374,9 @@ state scriptDataDoubleEscapeEnd,SCRIPT_DATA_DOUBLE_ESCAPE_END_STATE
     with_stack_frame
       mov rsi, r13
       add sil, 0x20
-      lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
-      call _h5aStringPushBackAscii
-      ; ...
+      lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
+      call _h5aCharacterQueuePushBack
+
       mov rdi, r13
       call _h5aTokenizerEmitCharacter
     end with_stack_frame
@@ -1386,9 +1386,9 @@ state scriptDataDoubleEscapeEnd,SCRIPT_DATA_DOUBLE_ESCAPE_END_STATE
   [[ASCII lower alpha]]
     with_stack_frame
       mov rsi, r13
-      lea rdi, [r12 + H5aParser.tokenizer.tag + TagToken.name]
-      call _h5aStringPushBackAscii
-      ; ...
+      lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]
+      call _h5aCharacterQueuePushBack
+
       mov rdi, r13
       call _h5aTokenizerEmitCharacter
     end with_stack_frame
@@ -1423,7 +1423,12 @@ state beforeAttributeName,BEFORE_ATTRIBUTE_NAME_STATE
     with_stack_frame
       token_error! unexpected_equals_sign_before_attribute_name
       call _h5aTokenizerStartAttribute
-      ; ...
+
+      mov rcx, qword [r12 + H5aParser.tokenizer.cur_attr]
+      lea rdi, [rcx + Attribute.name]
+      mov rsi, r13
+      call _h5aStringPushBackAscii
+
       mov byte [r12 + H5aParser.tokenizer.state], ATTRIBUTE_NAME_STATE
     end with_stack_frame
     xor al,al
@@ -1458,7 +1463,13 @@ state attributeName,ATTRIBUTE_NAME_STATE
     ret
 
   [[ASCII upper alpha]]
-    ; ... append
+    with_stack_frame
+      mov rsi, r13
+      add esi, 0x20
+      mov rcx, qword [r12 + H5aParser.tokenizer.cur_attr]
+      lea rdi, [rcx + Attribute.name]
+      call _h5aStringPushBackAscii
+    end with_stack_frame
     xor al,al
     ret
 
@@ -1467,7 +1478,9 @@ state attributeName,ATTRIBUTE_NAME_STATE
       token_error! unexpected_null_character
       xor rsi,rsi
       mov si, 0xFFFD
-      ; XXX: append
+      mov rcx, qword [r12 + H5aParser.tokenizer.cur_attr]
+      lea rdi, [rcx + Attribute.name]
+      call _h5aStringPushBackUnicode
     end with_stack_frame
     xor al,al
     ret
@@ -1482,7 +1495,10 @@ state attributeName,ATTRIBUTE_NAME_STATE
 
   [[Anything else]]
     with_stack_frame
-      ; append
+      mov rsi, r13
+      mov rcx, qword [r12 + H5aParser.tokenizer.cur_attr]
+      lea rdi, [rcx + Attribute.name]
+      call _h5aStringPushBackUnicode
     end with_stack_frame
     xor al,al
     ret
@@ -1516,7 +1532,7 @@ state afterAttributeName,AFTER_ATTRIBUTE_NAME_STATE
 
   [[EOF]]
     with_stack_frame
-      ; ...
+      token_error! eof_in_tag
     end with_stack_frame
     jmp _h5aTokenizerEmitEof
 
@@ -1582,9 +1598,12 @@ state attributeValueDoubleQuoted,ATTRIBUTE_VALUE_DOUBLE_QUOTED_STATE
 
   [[U+0000 NULL]]
     with_stack_frame
+      token_error! unexpected_null_character
       xor rsi,rsi
       mov si, 0xFFFD
-      ; XXX: append
+      mov rcx, qword [r12 + H5aParser.tokenizer.cur_attr]
+      lea rdi, [rcx + Attribute.value]
+      call _h5aStringPushBackUnicode
     end with_stack_frame
     xor al,al
     ret
@@ -1597,7 +1616,10 @@ state attributeValueDoubleQuoted,ATTRIBUTE_VALUE_DOUBLE_QUOTED_STATE
 
   [[Anything else]]
     with_stack_frame
-      ; ...
+      mov rsi, r13
+      mov rcx, qword [r12 + H5aParser.tokenizer.cur_attr]
+      lea rdi, [rcx + Attribute.value]
+      call _h5aStringPushBackUnicode
     end with_stack_frame
     xor al,al
     ret
@@ -1619,16 +1641,30 @@ state attributeValueSingleQuoted,ATTRIBUTE_VALUE_SINGLE_QUOTED_STATE
     ret
 
   [[U+0000 NULL]]
-    ; ...
+    with_stack_frame
+      token_error! unexpected_null_character
+      xor rsi,rsi
+      mov si, 0xFFFD
+      mov rcx, qword [r12 + H5aParser.tokenizer.cur_attr]
+      lea rdi, [rcx + Attribute.value]
+      call _h5aStringPushBackUnicode
+    end with_stack_frame
     xor al,al
     ret
 
   [[EOF]]
-    ; ...
+    with_stack_frame
+      token_error! eof_in_tag
+    end with_stack_frame
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
+    with_stack_frame
+      mov rsi, r13
+      mov rcx, qword [r12 + H5aParser.tokenizer.cur_attr]
+      lea rdi, [rcx + Attribute.value]
+      call _h5aStringPushBackUnicode
+    end with_stack_frame
     xor al,al
     ret
 
@@ -1662,9 +1698,11 @@ state attributeValueUnquoted,ATTRIBUTE_VALUE_UNQUOTED_STATE
   [[U+0000 NULL]]
     with_stack_frame
       token_error! unexpected_null_character
-      ; XXX: append
+      mov rcx, qword [r12 + H5aParser.tokenizer.cur_attr]
+      lea rdi, [rcx + Attribute.value]
       xor rsi,rsi
       mov si, 0xFFFD
+      call _h5aStringPushBackUnicode
     end with_stack_frame
     xor al,al
     ret
@@ -1687,7 +1725,10 @@ state attributeValueUnquoted,ATTRIBUTE_VALUE_UNQUOTED_STATE
 
   [[Anything else]]
     with_stack_frame
-      ; ...
+      mov rcx, qword [r12 + H5aParser.tokenizer.cur_attr]
+      lea rdi, [rcx + Attribute.value]
+      mov rsi, r13
+      call _h5aStringPushBackUnicode
     end with_stack_frame
     xor al,al
     ret
@@ -1711,18 +1752,24 @@ state afterAttributeValueQuoted,AFTER_ATTRIBUTE_VALUE_QUOTED_STATE
     ret
 
   [[U+003E GREATER-THAN SIGN]]
-    mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
-    ; emit
+    with_stack_frame
+      mov byte [r12 + H5aParser.tokenizer.state], DATA_STATE
+      call _h5aTokenizerEmitTag
+    end with_stack_frame
     xor al,al
     ret
 
   [[EOF]]
-    ; ..
+    with_stack_frame
+      token_error! eof_in_tag
+    end with_stack_frame
     jmp _h5aTokenizerEmitEof
 
   [[Anything else]]
-    ; ...
-    mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_NAME_STATE
+    with_stack_frame
+      token_error! missing_whitespace_between_attributes
+      mov byte [r12 + H5aParser.tokenizer.state], BEFORE_ATTRIBUTE_NAME_STATE
+    end with_stack_frame
     mov al, RESULT_RECONSUME
     ret
 
@@ -1888,8 +1935,6 @@ end state
 state comment,COMMENT_STATE
 
   [[U+003C LESS-THAN SIGN]]
-label tux
-public tux
     with_stack_frame
       mov rsi, r13
       lea rdi, [r12 + H5aParser.tokenizer.comment]

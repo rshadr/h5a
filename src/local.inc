@@ -1,3 +1,8 @@
+struct H5aHandle
+  x  dq ?
+  y  dq ?
+ends
+
 struct H5aVector
   data      dq ?
   size      dd ?
@@ -8,6 +13,11 @@ struct H5aString
   data      dq ?
   size      dd ?
   capacity  dd ?
+ends
+
+struct H5aStringView
+  data  dq ?
+  size  dq ?
 ends
 
 struct H5aCharacterQueue
@@ -33,9 +43,15 @@ struct Attribute
   value  rb sizeof.H5aString
 ends
 
+struct H5aAttributeView
+  name   rb sizeof.H5aStringView
+  value  rb sizeof.H5aStringView
+ends
+
 struct TagToken
   name                            rb sizeof.H5aString
   attributes                      rb sizeof.H5aVector
+  tag_index                       dd ?
   self_closing_flag               db ?
   acknowledged_self_closing_flag  db ?
 ends
@@ -50,6 +66,7 @@ struct H5aParser
   tokenizer.cur_attr          dq ?
   tokenizer.input_buffer      rb sizeof.H5aCharacterQueue
   tokenizer.temp_buffer       rb sizeof.H5aCharacterQueue
+  tokenizer.attr_views        rb sizeof.H5aVector
 
   treebuilder.template_modes  rb sizeof.H5aVector
   treebuilder.element_stack   rb sizeof.H5aVector
@@ -254,8 +271,9 @@ struct H5aSinkVTable
   complete_script dq ?
   is_mathml_annotation_xml_integration_point dq ?
 
-  get_tag_by_name dq ?
-  destroy_handle dq ?
+  get_tag_by_name  dq ?
+  destroy_handle   dq ?
+  clone_handle     dq ?
 ends
 
 enum

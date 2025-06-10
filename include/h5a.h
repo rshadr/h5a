@@ -242,17 +242,6 @@ typedef struct H5aStringView_s {
   size_t        size;
 } H5aStringView;
 
-typedef struct H5aQualifiedNameView_s {
-  H5aStringView  s;
-  H5aNamespace   name_space;
-  uint32_t       tag;
-} H5aQualifiedNameView;
-
-typedef struct H5aQualifiedName {
-  H5aNamespace  name_space;
-  uint32_t      tag;
-} H5aQualifiedName;
-
 typedef struct H5aAttributeView_s {
   H5aStringView name;
   H5aStringView value;
@@ -294,7 +283,8 @@ typedef struct H5aSinkVTable_s {
   void* (*elem_name)
     (H5aSink *self, H5aHandle target);
   H5aHandle (*create_element)
-    (H5aSink *self, H5aQualifiedNameView name, const H5aAttributeView *attrs, size_t num_attrs);
+    (H5aSink *self, H5aStringView name, H5aNamespace name_space, uint32_t tag_index,
+      const H5aAttributeView *attrs, size_t num_attrs);
   H5aHandle (*create_comment)
     (H5aSink *self, H5aStringView text);
   void (*append)
@@ -322,6 +312,8 @@ typedef struct H5aSinkVTable_s {
   H5aTag (*get_tag_by_name)
     (H5aSink *self, H5aStringView name);
   void (*destroy_handle)
+    (H5aSink *self, H5aHandle handle);
+  H5aHandle (*clone_handle)
     (H5aSink *self, H5aHandle handle);
 } H5aSinkVTable;
 

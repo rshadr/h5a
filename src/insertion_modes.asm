@@ -6,6 +6,7 @@
 include 'macro/struct.inc'
 include "util.inc"
 include "local.inc"
+include "tags.inc"
 include "insertion_modes.g"
 
 
@@ -29,15 +30,19 @@ _h5aTreeBuilderHandler.DUMMY.eof:
   mov al, RESULT_EOF_REACHED
   ret
 
-quirksCheck:
-  ; ...
-  xor rax,rax
-  ret
 
-limitedQuirksCheck:
+func quirksCheck, private
   ; ...
   xor rax,rax
   ret
+end func
+
+
+func limitedQuirksCheck, private
+  ; ...
+  xor rax,rax
+  ret
+end func
 
 
 mode initial,INITIAL_MODE
@@ -152,7 +157,7 @@ mode beforeHtml,BEFORE_HTML_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HEAD_MODE
@@ -160,10 +165,10 @@ mode beforeHtml,BEFORE_HTML_MODE
     xor al,al
     ret
 
-  [[End tag "head"]]
-  [[End tag "body"]]
-  [[End tag "html"]]
-  [[End tag "br"]]
+  [[End tag HEAD]]
+  [[End tag BODY]]
+  [[End tag HTML]]
+  [[End tag BR]]
     goto! anything_else
 
   [[Any other end tag]]
@@ -197,10 +202,10 @@ mode beforeHead,BEFORE_HEAD_MODE
     xor al,al
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
-  [[Start tag "head"]]
+  [[Start tag HEAD]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_HEAD_MODE
@@ -208,10 +213,10 @@ mode beforeHead,BEFORE_HEAD_MODE
     xor al,al
     ret
 
-  [[End tag "head"]]
-  [[End tag "body"]]
-  [[End tag "html"]]
-  [[End tag "br"]]
+  [[End tag HEAD]]
+  [[End tag BODY]]
+  [[End tag HTML]]
+  [[End tag BR]]
     goto! anything_else
 
   [[Any other end tag]]
@@ -251,33 +256,33 @@ mode inHead,IN_HEAD_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
-  [[Start tag "base"]]
-  [[Start tag "basefont"]]
-  [[Start tag "bgsound"]]
-  [[Start tag "link"]]
+  [[Start tag BASE]]
+  [[Start tag BASEFONT]]
+  [[Start tag BGSOUND]]
+  [[Start tag LINK]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[Start tag "meta"]]
+  [[Start tag META]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[Start tag "title"]]
+  [[Start tag TITLE]]
     jmp _h5aTreeBuilderGenericRcdataParse
 
 
 namespace noscript_and_clique
 
-  [[Start tag "noscript"]]
+  [[Start tag NOSCRIPT]]
     ; XXX: test
     xor al,al
     test al,al
@@ -290,15 +295,15 @@ noscript_scripting_disabled:
     xor al,al
     ret
 
-  [[Start tag "noframes"]]
-  [[Start tag "style"]]
+  [[Start tag NOFRAMES]]
+  [[Start tag STYLE]]
 noscript_scripting_enabled:
     jmp _h5aTreeBuilderGenericRawTextParse
 
 end namespace
 
 
-  [[Start tag "script"]]
+  [[Start tag SCRIPT]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.tokenizer.state], SCRIPT_DATA_STATE
@@ -309,7 +314,7 @@ end namespace
     xor al,al
     ret
 
-  [[End tag "head"]]
+  [[End tag HEAD]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], AFTER_HEAD_MODE
@@ -317,22 +322,22 @@ end namespace
     xor al,al
     ret
 
-  [[End tag "body"]]
-  [[End tag "html"]]
-  [[End tag "br"]]
+  [[End tag BODY]]
+  [[End tag HTML]]
+  [[End tag BR]]
     goto! anything_else
 
-  [[Start tag "template"]]
+  [[Start tag TEMPLATE]]
     ; ...
     xor al,al
     ret
 
-  [[End tag "template"]]
+  [[End tag TEMPLATE]]
     ; ...
     xor al,al
     ret
 
-  [[Start tag "head"]]
+  [[Start tag HEAD]]
   [[Any other end tag]]
     with_stack_frame
       ; ...
@@ -360,10 +365,10 @@ mode inHeadNoscript,IN_HEAD_NOSCRIPT_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
-  [[End tag "noscript"]]
+  [[End tag NOSCRIPT]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_HEAD_MODE
@@ -373,17 +378,17 @@ mode inHeadNoscript,IN_HEAD_NOSCRIPT_MODE
 
   [[Whitespace]]
   [[Comment]]
-  [[Start tag "basefont"]]
-  [[Start tag "bgsound"]]
-  [[Start tag "link"]]
-  [[Start tag "meta"]]
-  [[Start tag "noframes"]]
+  [[Start tag BASEFONT]]
+  [[Start tag BGSOUND]]
+  [[Start tag LINK]]
+  [[Start tag META]]
+  [[Start tag NOFRAMES]]
     process_using_rules! IN_HEAD_MODE
 
-  [[End tag "br"]]
+  [[End tag BR]]
     goto! anything_else
 
-  [[Start tag "head"]]
+  [[Start tag HEAD]]
   [[Any other end tag]]
     with_stack_frame
       ; ...
@@ -419,10 +424,10 @@ mode afterHead,AFTER_HEAD_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
-  [[Start tag "body"]]
+  [[Start tag BODY]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_BODY_MODE
@@ -430,7 +435,7 @@ mode afterHead,AFTER_HEAD_MODE
     xor al,al
     ret
 
-  [[Start tag "frameset"]]
+  [[Start tag FRAMESET]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_FRAMESET_MODE
@@ -438,16 +443,16 @@ mode afterHead,AFTER_HEAD_MODE
     xor al,al
     ret
 
-  [[Start tag "base"]]
-  [[Start tag "basefont"]]
-  [[Start tag "bgsound"]]
-  [[Start tag "link"]]
-  [[Start tag "meta"]]
-  [[Start tag "noframes"]]
-  [[Start tag "script"]]
-  [[Start tag "style"]]
-  [[Start tag "template"]]
-  [[Start tag "title"]]
+  [[Start tag BASE]]
+  [[Start tag BASEFONT]]
+  [[Start tag BGSOUND]]
+  [[Start tag LINK]]
+  [[Start tag META]]
+  [[Start tag NOFRAMES]]
+  [[Start tag SCRIPT]]
+  [[Start tag STYLE]]
+  [[Start tag TEMPLATE]]
+  [[Start tag TITLE]]
     with_stack_frame
       ; ...
       call_rules! IN_HEAD_MODE
@@ -455,15 +460,15 @@ mode afterHead,AFTER_HEAD_MODE
     xor al,al
     ret
 
-  [[End tag "template"]]
+  [[End tag TEMPLATE]]
     process_using_rules! IN_HEAD_MODE
 
-  [[End tag "body"]]
-  [[End tag "html"]]
-  [[End tag "br"]]
+  [[End tag BODY]]
+  [[End tag HTML]]
+  [[End tag BR]]
     goto! anything_else
 
-  [[Start tag "head"]]
+  [[Start tag HEAD]]
   [[Any other end tag]]
     with_stack_frame
       ; ...
@@ -520,32 +525,32 @@ mode inBody,IN_BODY_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[Start tag "base"]]
-  [[Start tag "basefont"]]
-  [[Start tag "bgsound"]]
-  [[Start tag "link"]]
-  [[Start tag "meta"]]
-  [[Start tag "noframes"]]
-  [[Start tag "script"]]
-  [[Start tag "style"]]
-  [[Start tag "template"]]
-  [[Start tag "title"]]
-  [[End tag "template"]]
+  [[Start tag BASE]]
+  [[Start tag BASEFONT]]
+  [[Start tag BGSOUND]]
+  [[Start tag LINK]]
+  [[Start tag META]]
+  [[Start tag NOFRAMES]]
+  [[Start tag SCRIPT]]
+  [[Start tag STYLE]]
+  [[Start tag TEMPLATE]]
+  [[Start tag TITLE]]
+  [[End tag TEMPLATE]]
     process_using_rules! IN_HEAD_MODE
 
-  [[Start tag "body"]]
+  [[Start tag BODY]]
     ; ...
     xor al,al
     ret
 
-  [[Start tag "frameset"]]
+  [[Start tag FRAMESET]]
     ; ...
     xor al,al
     ret
@@ -555,7 +560,7 @@ mode inBody,IN_BODY_MODE
     mov al, RESULT_STOP
     ret
 
-  [[End tag "body"]]
+  [[End tag BODY]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], AFTER_BODY_MODE
@@ -563,7 +568,7 @@ mode inBody,IN_BODY_MODE
     xor al,al
     ret
 
-  [[End tag "html"]]
+  [[End tag HTML]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], AFTER_BODY_MODE
@@ -571,31 +576,31 @@ mode inBody,IN_BODY_MODE
     mov al, RESULT_REPROCESS
     ret
 
-  [[Start tag "address"]]
-  [[Start tag "article"]]
-  [[Start tag "aside"]]
-  [[Start tag "blockquote"]]
-  [[Start tag "center"]]
-  [[Start tag "details"]]
-  [[Start tag "dialog"]]
-  [[Start tag "dir"]]
-  [[Start tag "div"]]
-  [[Start tag "dl"]]
-  [[Start tag "fieldset"]]
-  [[Start tag "figcaption"]]
-  [[Start tag "figure"]]
-  [[Start tag "footer"]]
-  [[Start tag "header"]]
-  [[Start tag "hgroup"]]
-  [[Start tag "main"]]
-  [[Start tag "menu"]]
-  [[Start tag "nav"]]
-  [[Start tag "ol"]]
-  [[Start tag "p"]]
-  [[Start tag "search"]]
-  [[Start tag "section"]]
-  [[Start tag "summary"]]
-  [[Start tag "ul"]]
+  [[Start tag ADDRESS]]
+  [[Start tag ARTICLE]]
+  [[Start tag ASIDE]]
+  [[Start tag BLOCKQUOTE]]
+  [[Start tag CENTER]]
+  [[Start tag DETAILS]]
+  [[Start tag DIALOG]]
+  [[Start tag DIR]]
+  [[Start tag DIV]]
+  [[Start tag DL]]
+  [[Start tag FIELDSET]]
+  [[Start tag FIGCAPTION]]
+  [[Start tag FIGURE]]
+  [[Start tag FOOTER]]
+  [[Start tag HEADER]]
+  [[Start tag HGROUP]]
+  [[Start tag MAIN]]
+  [[Start tag MENU]]
+  [[Start tag NAV]]
+  [[Start tag OL]]
+  [[Start tag P]]
+  [[Start tag SEARCH]]
+  [[Start tag SECTION]]
+  [[Start tag SUMMARY]]
+  [[Start tag UL]]
     with_stack_frame
       ; ...
     end with_stack_frame
@@ -633,7 +638,7 @@ mode text,TEXT_MODE
     xor al,al
     ret
 
-  [[End tag "script"]]
+  [[End tag SCRIPT]]
     unimplemented
     with_stack_frame
       ; ...
@@ -674,7 +679,7 @@ mode inTable,IN_TABLE_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "caption"]]
+  [[Start tag CAPTION]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_CAPTION_MODE
@@ -682,7 +687,7 @@ mode inTable,IN_TABLE_MODE
     xor al,al
     ret
 
-  [[Start tag "colgroup"]]
+  [[Start tag COLGROUP]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_COLUMN_GROUP_MODE
@@ -690,7 +695,7 @@ mode inTable,IN_TABLE_MODE
     xor al,al
     ret
 
-  [[Start tag "col"]]
+  [[Start tag COL]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_COLUMN_GROUP_MODE
@@ -698,9 +703,9 @@ mode inTable,IN_TABLE_MODE
     mov al, RESULT_REPROCESS
     ret
 
-  [[Start tag "tbody"]]
-  [[Start tag "tfoot"]]
-  [[Start tag "thead"]]
+  [[Start tag TBODY]]
+  [[Start tag TFOOT]]
+  [[Start tag THEAD]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_BODY_MODE
@@ -708,9 +713,9 @@ mode inTable,IN_TABLE_MODE
     xor al,al
     ret
 
-  [[Start tag "td"]]
-  [[Start tag "th"]]
-  [[Start tag "tr"]]
+  [[Start tag TD]]
+  [[Start tag TH]]
+  [[Start tag TR]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_BODY_MODE
@@ -718,44 +723,44 @@ mode inTable,IN_TABLE_MODE
     mov al, RESULT_REPROCESS
     ret
 
-  [[Start tag "table"]]
+  [[Start tag TABLE]]
     with_stack_frame
       ; ...
     end with_stack_frame
     mov al, RESULT_REPROCESS
     ret
 
-  [[End tag "table"]]
+  [[End tag TABLE]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[End tag "body"]]
-  [[End tag "caption"]]
-  [[End tag "col"]]
-  [[End tag "colgroup"]]
-  [[End tag "html"]]
-  [[End tag "tbody"]]
-  [[End tag "td"]]
-  [[End tag "tfoot"]]
-  [[End tag "th"]]
-  [[End tag "thead"]]
-  [[End tag "tr"]]
+  [[End tag BODY]]
+  [[End tag CAPTION]]
+  [[End tag COL]]
+  [[End tag COLGROUP]]
+  [[End tag HTML]]
+  [[End tag TBODY]]
+  [[End tag TD]]
+  [[End tag TFOOT]]
+  [[End tag TH]]
+  [[End tag THEAD]]
+  [[End tag TR]]
     with_stack_frame
       ; ...
     end with_stack_frame
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "style"]]
-  [[Start tag "script"]]
-  [[Start tag "template"]]
-  [[End tag "template"]]
+  [[Start tag STYLE]]
+  [[Start tag SCRIPT]]
+  [[Start tag TEMPLATE]]
+  [[End tag TEMPLATE]]
     process_using_rules! IN_HEAD_MODE
 
-  [[Start tag "input"]]
+  [[Start tag INPUT]]
     with_stack_frame
       ; ...
     end with_stack_frame
@@ -766,7 +771,7 @@ mode inTable,IN_TABLE_MODE
     xor al,al
     ret
 
-  [[Start tag "form"]]
+  [[Start tag FORM]]
     with_stack_frame
       ; ...
     end with_stack_frame
@@ -841,30 +846,30 @@ mode inColumnGroup,IN_COLUMN_GROUP_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
-  [[Start tag "col"]]
+  [[Start tag COL]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[End tag "colgroup"]]
+  [[End tag COLGROUP]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[End tag "col"]]
+  [[End tag COL]]
     ; ...
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "template"]]
-  [[End tag "template"]]
+  [[Start tag TEMPLATE]]
+  [[End tag TEMPLATE]]
     process_using_rules! IN_HEAD_MODE
 
   [[EOF]]
@@ -883,7 +888,7 @@ end mode
 
 mode inTableBody,IN_TABLE_BODY_MODE
 
-  [[Start tag "tr"]]
+  [[Start tag TR]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
@@ -891,8 +896,8 @@ mode inTableBody,IN_TABLE_BODY_MODE
     xor al,al
     ret
 
-  [[Start tag "th"]]
-  [[Start tag "td"]]
+  [[Start tag TH]]
+  [[Start tag TD]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
@@ -900,9 +905,9 @@ mode inTableBody,IN_TABLE_BODY_MODE
     mov al, RESULT_REPROCESS
     ret
 
-  [[End tag "tbody"]]
-  [[End tag "tfoot"]]
-  [[End tag "thead"]]
+  [[End tag TBODY]]
+  [[End tag TFOOT]]
+  [[End tag THEAD]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_MODE
@@ -910,12 +915,12 @@ mode inTableBody,IN_TABLE_BODY_MODE
     xor al,al
     ret
 
-  [[Start tag "col"]]
-  [[Start tag "colgroup"]]
-  [[Start tag "tbody"]]
-  [[Start tag "tfoot"]]
-  [[Start tag "thead"]]
-  [[End tag "table"]]
+  [[Start tag COL]]
+  [[Start tag COLGROUP]]
+  [[Start tag TBODY]]
+  [[Start tag TFOOT]]
+  [[Start tag THEAD]]
+  [[End tag TABLE]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_MODE
@@ -923,13 +928,13 @@ mode inTableBody,IN_TABLE_BODY_MODE
     mov al, RESULT_REPROCESS
     ret
 
-  [[End tag "body"]]
-  [[End tag "caption"]]
-  [[End tag "colgroup"]]
-  [[End tag "html"]]
-  [[End tag "td"]]
-  [[End tag "th"]]
-  [[End tag "tr"]]
+  [[End tag BODY]]
+  [[End tag CAPTION]]
+  [[End tag COLGROUP]]
+  [[End tag HTML]]
+  [[End tag TD]]
+  [[End tag TH]]
+  [[End tag TR]]
     with_stack_frame
       ; ...
     end with_stack_frame
@@ -944,35 +949,35 @@ end mode
 
 mode inRow,IN_ROW_MODE
 
-  [[Start tag "th"]]
-  [[Start tag "td"]]
+  [[Start tag TH]]
+  [[Start tag TD]]
     ; ...
     mov byte [r12 + H5aParser.treebuilder.mode], IN_CELL_MODE
     xor al,al
     ret
 
-  [[End tag "tr"]]
+  [[End tag TR]]
     ; ...
     mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_BODY_MODE
     xor al,al
     ret
 
-  [[Start tag "caption"]]
-  [[Start tag "col"]]
-  [[Start tag "colgroup"]]
-  [[Start tag "tbody"]]
-  [[Start tag "tfoot"]]
-  [[Start tag "thead"]]
-  [[Start tag "tr"]]
-  [[End tag "table"]]
+  [[Start tag CAPTION]]
+  [[Start tag COL]]
+  [[Start tag COLGROUP]]
+  [[Start tag TBODY]]
+  [[Start tag TFOOT]]
+  [[Start tag THEAD]]
+  [[Start tag TR]]
+  [[End tag TABLE]]
     ; ...
     mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_BODY_MODE
     mov al, RESULT_REPROCESS
     ret
 
-  [[End tag "tbody"]]
-  [[End tag "tfoot"]]
-  [[End tag "thead"]]
+  [[End tag TBODY]]
+  [[End tag TFOOT]]
+  [[End tag THEAD]]
     ; ...
     mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_BODY_MODE
     mov al, RESULT_REPROCESS
@@ -984,49 +989,50 @@ mode inRow,IN_ROW_MODE
 end mode
 
 
-close_cell:
+func close_cell, private
   with_stack_frame
     ; ...
     mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
   end with_stack_frame
   ret
+end func
 
 mode inCell,IN_CELL_MODE
 
-  [[End tag "td"]]
-  [[End tag "th"]]
+  [[End tag TD]]
+  [[End tag TH]]
     ; ...
     mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
     xor al,al
     ret
 
-  [[Start tag "caption"]]
-  [[Start tag "col"]]
-  [[Start tag "colgroup"]]
-  [[Start tag "tbody"]]
-  [[Start tag "td"]]
-  [[Start tag "tfoot"]]
-  [[Start tag "th"]]
-  [[Start tag "thead"]]
-  [[Start tag "tr"]]
+  [[Start tag CAPTION]]
+  [[Start tag COL]]
+  [[Start tag COLGROUP]]
+  [[Start tag TBODY]]
+  [[Start tag TD]]
+  [[Start tag TFOOT]]
+  [[Start tag TH]]
+  [[Start tag THEAD]]
+  [[Start tag TR]]
     ; ...
     mov al, RESULT_REPROCESS
     ret
 
-  [[End tag "body"]]
-  [[End tag "caption"]]
-  [[End tag "col"]]
-  [[End tag "colgroup"]]
-  [[End tag "html"]]
+  [[End tag BODY]]
+  [[End tag CAPTION]]
+  [[End tag COL]]
+  [[End tag COLGROUP]]
+  [[End tag HTML]]
     ; ...
     mov al, RESULT_IGNORE
     ret
 
-  [[End tag "table"]]
-  [[End tag "tbody"]]
-  [[End tag "tfoot"]]
-  [[End tag "thead"]]
-  [[End tag "tr"]]
+  [[End tag TABLE]]
+  [[End tag TBODY]]
+  [[End tag TFOOT]]
+  [[End tag THEAD]]
+  [[End tag TR]]
     ; ...
     mov al, RESULT_REPROCESS
     ret
@@ -1066,45 +1072,45 @@ mode inSelect,IN_SELECT_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
-  [[Start tag "option"]]
+  [[Start tag OPTION]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[Start tag "optgroup"]]
+  [[Start tag OPTGROUP]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[Start tag "hr"]]
+  [[Start tag HR]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[End tag "optgroup"]]
+  [[End tag OPTGROUP]]
     with_stack_frame
       ; ...
     end with_stack_frame
     mov al, RESULT_IGNORE
     ret
 
-  [[End tag "option"]]
+  [[End tag OPTION]]
     with_stack_frame
       ; ...
     end with_stack_frame
     mov al, RESULT_IGNORE
     ret
 
-  [[End tag "select"]]
+  [[End tag SELECT]]
     with_stack_frame
       ; ...
     end with_stack_frame
@@ -1115,25 +1121,25 @@ mode inSelect,IN_SELECT_MODE
     xor al,al
     ret
 
-  [[Start tag "select"]]
+  [[Start tag SELECT]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[Start tag "input"]]
-  [[Start tag "keygen"]]
-  [[Start tag "textarea"]]
+  [[Start tag INPUT]]
+  [[Start tag KEYGEN]]
+  [[Start tag TEXTAREA]]
     with_stack_frame
       ; ...
     end with_stack_frame
     mov al, RESULT_REPROCESS
     ret
 
-  [[Start tag "script"]]
-  [[Start tag "template"]]
-  [[End tag "template"]]
+  [[Start tag SCRIPT]]
+  [[Start tag TEMPLATE]]
+  [[End tag TEMPLATE]]
     process_using_rules! IN_HEAD_MODE
 
     
@@ -1152,28 +1158,28 @@ end mode
 
 mode inSelectInTable,IN_SELECT_IN_TABLE_MODE
 
-  [[Start tag "caption"]]
-  [[Start tag "table"]]
-  [[Start tag "tbody"]]
-  [[Start tag "tfoot"]]
-  [[Start tag "thead"]]
-  [[Start tag "tr"]]
-  [[Start tag "td"]]
-  [[Start tag "th"]]
+  [[Start tag CAPTION]]
+  [[Start tag TABLE]]
+  [[Start tag TBODY]]
+  [[Start tag TFOOT]]
+  [[Start tag THEAD]]
+  [[Start tag TR]]
+  [[Start tag TD]]
+  [[Start tag TH]]
     with_stack_frame
       ; ...
     end with_stack_frame
     mov al, RESULT_REPROCESS
     ret
 
-  [[End tag "caption"]]
-  [[End tag "table"]]
-  [[End tag "tbody"]]
-  [[End tag "tfoot"]]
-  [[End tag "thead"]]
-  [[End tag "tr"]]
-  [[End tag "td"]]
-  [[End tag "th"]]
+  [[End tag CAPTION]]
+  [[End tag TABLE]]
+  [[End tag TBODY]]
+  [[End tag TFOOT]]
+  [[End tag THEAD]]
+  [[End tag TR]]
+  [[End tag TD]]
+  [[End tag TH]]
     with_stack_frame
       ; ...
     end with_stack_frame
@@ -1198,24 +1204,24 @@ mode inTemplate, IN_TEMPLATE_MODE
   [[DOCTYPE]]
     process_using_rules! IN_BODY_MODE
 
-  [[Start tag "base"]]
-  [[Start tag "basefont"]]
-  [[Start tag "bgsound"]]
-  [[Start tag "link"]]
-  [[Start tag "meta"]]
-  [[Start tag "noframes"]]
-  [[Start tag "script"]]
-  [[Start tag "style"]]
-  [[Start tag "template"]]
-  [[Start tag "title"]]
-  [[End tag "template"]]
+  [[Start tag BASE]]
+  [[Start tag BASEFONT]]
+  [[Start tag BGSOUND]]
+  [[Start tag LINK]]
+  [[Start tag META]]
+  [[Start tag NOFRAMES]]
+  [[Start tag SCRIPT]]
+  [[Start tag STYLE]]
+  [[Start tag TEMPLATE]]
+  [[Start tag TITLE]]
+  [[End tag TEMPLATE]]
     process_using_rules! IN_HEAD_MODE
 
-  [[Start tag "caption"]]
-  [[Start tag "colgroup"]]
-  [[Start tag "tbody"]]
-  [[Start tag "tfoot"]]
-  [[Start tag "thead"]]
+  [[Start tag CAPTION]]
+  [[Start tag COLGROUP]]
+  [[Start tag TBODY]]
+  [[Start tag TFOOT]]
+  [[Start tag THEAD]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_MODE
@@ -1223,7 +1229,7 @@ mode inTemplate, IN_TEMPLATE_MODE
     mov al, RESULT_REPROCESS
     ret
 
-  [[Start tag "col"]]
+  [[Start tag COL]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_COLUMN_GROUP_MODE
@@ -1231,7 +1237,7 @@ mode inTemplate, IN_TEMPLATE_MODE
     mov al, RESULT_REPROCESS
     ret
 
-  [[Start tag "tr"]]
+  [[Start tag TR]]
     with_stack_frame
       ; ...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_BODY_MODE
@@ -1239,8 +1245,8 @@ mode inTemplate, IN_TEMPLATE_MODE
     mov al, RESULT_REPROCESS
     ret
 
-  [[Start tag "td"]]
-  [[Start tag "th"]]
+  [[Start tag TD]]
+  [[Start tag TH]]
     with_stack_frame
       ;...
       mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
@@ -1298,10 +1304,10 @@ mode afterBody,AFTER_BODY_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
-  [[End tag "html"]]
+  [[End tag HTML]]
     ; ...
     mov byte [r12 + H5aParser.treebuilder.mode], AFTER_AFTER_BODY_MODE
     xor al,al
@@ -1343,15 +1349,15 @@ mode inFrameset,IN_FRAMESET_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
-  [[Start tag "frameset"]]
+  [[Start tag FRAMESET]]
     ; ...
     xor al,al
     ret
 
-  [[End tag "frameset"]]
+  [[End tag FRAMESET]]
     with_stack_frame
       ; ...
       xor al,al ;!!
@@ -1360,14 +1366,14 @@ mode inFrameset,IN_FRAMESET_MODE
     xor al,al
     ret
 
-  [[Start tag "frame"]]
+  [[Start tag FRAME]]
     with_stack_frame
       ; ...
     end with_stack_frame
     xor al,al
     ret
 
-  [[Start tag "noframes"]]
+  [[Start tag NOFRAMES]]
     process_using_rules! IN_HEAD_MODE
 
   [[EOF]]
@@ -1402,10 +1408,10 @@ mode afterFrameset,AFTER_FRAMESET_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
-  [[End tag "html"]]
+  [[End tag HTML]]
     mov byte [r12 + H5aParser.treebuilder.mode], AFTER_AFTER_FRAMESET_MODE
     xor al,al
     ret
@@ -1432,7 +1438,7 @@ mode afterAfterBody,AFTER_AFTER_BODY_MODE
 
   [[DOCTYPE]]
   [[Whitespace]]
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
   [[EOF]]
@@ -1461,14 +1467,14 @@ mode afterAfterFrameset,AFTER_AFTER_FRAMESET_MODE
 
   [[DOCTYPE]]
   [[Whitespace]]
-  [[Start tag "html"]]
+  [[Start tag HTML]]
     process_using_rules! IN_BODY_MODE
 
   [[EOF]]
     mov al, RESULT_STOP
     ret
 
-  [[Start tag "noframes"]]
+  [[Start tag NOFRAMES]]
     process_using_rules! IN_HEAD_MODE
 
   [[Anything else]]
@@ -1509,54 +1515,53 @@ mode inForeignContent,IN_FOREIGN_CONTENT_MODE
     mov al, RESULT_IGNORE
     ret
 
-  [[Start tag "b"]]
-  [[Start tag "big"]]
-  [[Start tag "blockquote"]]
-  [[Start tag "body"]]
-  [[Start tag "br"]]
-  [[Start tag "center"]]
-  [[Start tag "code"]]
-  [[Start tag "dd"]]
-  [[Start tag "div"]]
-  [[Start tag "dl"]]
-  [[Start tag "dt"]]
-  [[Start tag "em"]]
-  [[Start tag "embed"]]
-  [[Start tag "h1"]]
-  [[Start tag "h2"]]
-  [[Start tag "h3"]]
-  [[Start tag "h4"]]
-  [[Start tag "h5"]]
-  [[Start tag "h5"]]
-  [[Start tag "h6"]]
-  [[Start tag "head"]]
-  [[Start tag "hr"]]
-  [[Start tag "i"]]
-  [[Start tag "img"]]
-  [[Start tag "li"]]
-  [[Start tag "listing"]]
-  [[Start tag "menu"]]
-  [[Start tag "meta"]]
-  [[Start tag "nobr"]]
-  [[Start tag "ol"]]
-  [[Start tag "p"]]
-  [[Start tag "pre"]]
-  [[Start tag "ruby"]]
-  [[Start tag "s"]]
-  [[Start tag "small"]]
-  [[Start tag "span"]]
-  [[Start tag "strong"]]
-  [[Start tag "strike"]]
-  [[Start tag "sub"]]
-  [[Start tag "sup"]]
-  [[Start tag "table"]]
-  [[Start tag "tt"]]
-  [[Start tag "u"]]
-  [[Start tag "ul"]]
-  [[Start tag "var"]]
+  [[Start tag B]]
+  [[Start tag BIG]]
+  [[Start tag BLOCKQUOTE]]
+  [[Start tag BODY]]
+  [[Start tag BR]]
+  [[Start tag CENTER]]
+  [[Start tag CODE]]
+  [[Start tag DD]]
+  [[Start tag DIV]]
+  [[Start tag DL]]
+  [[Start tag DT]]
+  [[Start tag EM]]
+  [[Start tag EMBED]]
+  [[Start tag H1]]
+  [[Start tag H2]]
+  [[Start tag H3]]
+  [[Start tag H4]]
+  [[Start tag H5]]
+  [[Start tag H6]]
+  [[Start tag HEAD]]
+  [[Start tag HR]]
+  [[Start tag I]]
+  [[Start tag IMG]]
+  [[Start tag LI]]
+  [[Start tag LISTING]]
+  [[Start tag MENU]]
+  [[Start tag META]]
+  [[Start tag NOBR]]
+  [[Start tag OL]]
+  [[Start tag P]]
+  [[Start tag PRE]]
+  [[Start tag RUBY]]
+  [[Start tag S]]
+  [[Start tag SMALL]]
+  [[Start tag SPAN]]
+  [[Start tag STRONG]]
+  [[Start tag STRIKE]]
+  [[Start tag SUB]]
+  [[Start tag SUP]]
+  [[Start tag TABLE]]
+  [[Start tag TT]]
+  [[Start tag U]]
+  [[Start tag UL]]
+  [[Start tag VAR]]
   ;[[Start tag "font"]]
-  [[End tag "br"]]
-  [[End tag "p"]]
+  [[End tag BR]]
+  [[End tag P]]
     ; ...
     movzx rax, byte [r12 + H5aParser.treebuilder.mode]
     process_using_rules! rax
@@ -1582,6 +1587,7 @@ end mode
 section '.rodata'
   generate_tables
 
+;; BUG: This is required because fasm otherwise refuses to emit relocations for the whole section??
 public myLabel
 myLabel:
   dq 0x90

@@ -8,7 +8,7 @@
 ;;;; - 'Any other character' must be the last in any clause block.
 ;;;;   Not a problem if standard-compliant.
 ;;;; - According to measurements, the "jmp +00" idiom does not cause any
-;;;;   noticeable performance issues.
+;;;;   performance issues.
 ;;;;
 
 macro mode? name*,index_name*
@@ -109,7 +109,7 @@ macro mode? name*,index_name*
   end calminstruction
 
 
-  calminstruction stride_start_tag qname_idx*
+  calminstruction stride_start_tag qname_postfix*
     local var
 
     arrange var, =public stag_next_label
@@ -123,8 +123,8 @@ macro mode? name*,index_name*
     arrange stag_next_label, prefix.=startTagCheck.stag_index
 
     ; XXX: check tag struct
-    arrange var, =cmp =eax, 0xFFFF
-    ; what an useless line.
+    asm mov eax, dword [rdi + TagToken.tag_index]
+    arrange var, =cmp =eax, =H5A_TAG_#qname_postfix
     assemble var
     arrange var, =je action_next_label
     assemble var
@@ -136,7 +136,7 @@ macro mode? name*,index_name*
   end calminstruction
 
 
-  calminstruction stride_end_tag qname_idx*
+  calminstruction stride_end_tag qname_postfix*
     local var
 
     arrange var, =public etag_next_label
@@ -150,8 +150,8 @@ macro mode? name*,index_name*
     arrange etag_next_label, prefix.=endTagCheck.etag_index
 
     ; XXX: check tag struct
-    arrange var, =cmp =eax, 0xFFFF
-    ; what an useless line.
+    asm mov eax, dword [rdi + TagToken.tag_index]
+    arrange var, =cmp =eax, =H5A_TAG_#qname_postfix
     assemble var
     arrange var, =je action_next_label
     assemble var

@@ -308,8 +308,14 @@ calminstruction zero_init? ptr*,size*
 
 already_rsi:
   asm xor al,al
+
+  match =ecx, size
+  jyes already_ecx
+
   asm xor rcx,rcx
   arrange var, =mov =ecx, size
+
+already_ecx:
   assemble var
   asm rep stosb
 end calminstruction

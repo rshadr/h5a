@@ -307,14 +307,92 @@ end func
 ;;;
 
 func _h5aElementVectorCreate, public
-  ; ...
-  unimplemented
+;; RDI : H5aVector<H5aHandle> *vector
+;; -> void
+  with_stack_frame
+    xor rsi,rsi
+    mov si, (16 * sizeof.H5aHandle)
+    call _h5aVectorCreate
+  end with_stack_frame
+  ret
 end func
 
 
 func _h5aElementVectorDestroy, public
-  ; ...
+;; R12 : H5aParser *parser
+;; RDI : H5aVector<H5aHandle> *vector
+;; -> void
+  with_saved_regs rbx, r13, r14
+    mov rbx, rdi ;vector
+    xor r13,r13
+    mov r13d, dword [rbx + H5aVector.size] ;size
+    shr r13, (bsr sizeof.H5aVector)
+    xor r14,r14 ;counter
+
+.loop:
+    cmp r14, r13
+    jae .after_loop
+
+    mov rdi, qword [r12 + H5aParser.sink.user_data]
+    mov rcx, r14
+    shl rcx, (bsr sizeof.H5aHandle)
+    mov r8, qword [rbx + H5aVector.data]
+    mov rsi, qword [r8 + rcx + H5aHandle.x]
+    mov rdx, qword [r8 + rcx + H5aHandle.y]
+    mov rax, qword [r12 + H5aParser.sink.vtable]
+    call qword [rax + H5aSinkVTable.destroy_handle]
+
+    inc r14
+    jmp .loop
+
+.after_loop:
+    mov rdi, rbx
+    call _h5aVectorDestroy
+  end with_saved_regs
+  ret
+end func
+
+
+func _h5aElementVectorPushBack, public
+;; R12 : H5aParser *parser
+;; RDI : H5aVector<H5aHandle> *vector
+;; RSI:RDX : H5aHandle handle
+;; -> void
+;;; UNTESTED
   unimplemented
+  with_saved_regs rbx, r13, r14
+    mov rbx, rdi ;vector
+
+    mov rdi, qword [r12 + H5aParser.sink.user_data]
+    ;mov rsi, rsi
+    ;mov rdx, rdx
+    mov rax, qword [r12 + H5aParser.sink.vtable]
+    call qword [rax + H5aSinkVTable.clone_handle]
+    ; -> RAX:RDX : handle
+    mov r13, rax
+    mov r14, rdx
+
+    mov rdi, rbx
+    xor rsi,rsi
+    mov sil, sizeof.H5aHandle
+    call _h5aVectorMaybeGrow
+
+    xor rcx,rcx
+    mov ecx, dword [rbx + H5aVector.size]
+    mov rdx, qword [rbx + H5aVector.data]
+    mov qword [rdx + rcx + H5aHandle.x], r13
+    mov qword [rdx + rcx + H5aHandle.y], r14
+
+    add ecx, sizeof.H5aHandle
+    mov dword [rbx + H5aVector.size], ecx
+  end with_saved_regs
+  ret
+end func
+
+
+func _h5aElementVectorPopBack, public
+  unimplemented
+  ; ...
 end func
 
 
@@ -462,6 +540,7 @@ func _h5aAttrVectorPushSlot, public
 
 .finish:
     xor rcx,rcx
+    inc dword [rbx + H5aVector.size]
     mov ecx, dword [rbx + H5aVector.size]
     dec ecx
     mov rdx, qword [rbx + H5aVector.data]
@@ -471,4 +550,91 @@ func _h5aAttrVectorPushSlot, public
   ret
 end func
 
+
+;;;
+;;; H5aVector<H5aAttributeView>
+;;;
+
+func _h5aAttrViewVectorCreate, public
+;; RDI : $
+;; -> void
+  with_saved_regs rbx
+    mov rbx, rdi
+
+    mov rdi, rbx
+    xor rsi,rsi
+    mov si, (16 * sizeof.H5aAttributeView)
+    call _h5aVectorCreate
+  end with_saved_regs
+  ret
+end func
+
+
+func _h5aAttrViewVectorDestroy, public
+;; RDI : $
+;; -> void
+  with_saved_regs rbx
+    mov rbx, rdi
+
+    mov rdi, rbx
+    call _h5aVectorDestroy
+  end with_saved_regs
+  ret
+end func
+
+
+func _h5aAttrViewVectorClear, public
+;; RDI : $
+;; -> void
+  with_saved_regs rbx
+    mov rbx, rdi
+
+    mov ecx, dword [rbx + H5aVector.size]
+    shl ecx, (bsr sizeof.H5aAttributeView)
+    zero_init qword [rbx + H5aVector.data], ecx
+  end with_saved_regs
+  ret
+end func
+
+
+func _h5aAttrViewVectorGenerate, public
+;; RDI : H5aVector<H5aAttributeView> *vector
+;; RSI : H5aVector<H5aAttribute> *source
+;; -> void
+  with_saved_regs rbx, r13, r14
+    mov rbx, rdi ;vector
+    mov r13, rsi ;source
+    xor r14,r14
+    mov r14d, dword [r13 + H5aVector.size] ;source_size
+    shr r14, (bsr sizeof.Attribute)
+
+    mov rdi, rbx
+    xor rsi,rsi
+    mov esi, dword [r13 + H5aVector.size] ;source_size
+    call _h5aVectorMaybeGrow
+
+    mov rcx, r14
+    jrcxz .after_loop
+    mov rdx, qword [rbx + H5aVector.data] ;vector_data
+    mov r8,  qword [rbx + H5aVector.data] ;source_data
+.loop:
+    mov rax, r14
+    sub rax, rcx ;get index
+    mov r9, rax
+    shl rax, (bsr sizeof.H5aAttributeView) ;vector_offset
+    shl r9,  (bsr sizeof.Attribute) ;source_offset
+
+    iterate member, name,value
+      mov r10, qword [r8 + r9 + Attribute.#member + H5aString.data]
+      mov qword [rdx + rax + H5aAttributeView.#member + H5aStringView.data], r10
+      xor r10,r10
+      mov r10d, dword [r8 + r9 + Attribute.#member + H5aString.size]
+      mov qword [rdx + rax + H5aAttributeView.#member + H5aStringView.size], r10
+    end iterate
+
+    loop .loop
+.after_loop:
+  end with_saved_regs
+  ret
+end func
 
