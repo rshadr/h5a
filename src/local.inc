@@ -62,6 +62,11 @@ struct H5aParser
   sink.vtable                 dq ?
   sink.user_data              dq ?
 
+  calloc_cb                   dq ?
+  realloc_cb                  dq ?
+  free_cb                     dq ?
+  memcpy_cb                   dq ?
+
   tokenizer.char_ref          dq ?
   tokenizer.cur_attr          dq ?
   tokenizer.input_buffer      rb sizeof.H5aCharacterQueue
@@ -247,8 +252,14 @@ end enum
 struct H5aParserCreateInfo
   input_get_char   dq ?
   input_user_data  dq ?
+
   sink_vtable      dq ?
   sink_user_data   dq ?
+
+  calloc_cb        dq ?
+  realloc_cb       dq ?
+  free_cb          dq ?
+  memcpy_cb        dq ?
 ends
 
 struct H5aSinkVTable

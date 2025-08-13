@@ -280,7 +280,7 @@ typedef struct H5aSinkVTable_s {
     (H5aSink *self, H5aQuirksMode mode);
   bool (*same_node)
     (H5aSink *self, H5aHandle x, H5aHandle y);
-  void* (*elem_name)
+  H5aTag (*elem_name)
     (H5aSink *self, H5aHandle target);
   H5aHandle (*create_element)
     (H5aSink *self, H5aStringView name, H5aNamespace name_space, uint32_t tag_index,
@@ -315,6 +315,10 @@ typedef struct H5aSinkVTable_s {
     (H5aSink *self, H5aHandle handle);
   H5aHandle (*clone_handle)
     (H5aSink *self, H5aHandle handle);
+#if 0
+  void (*process_internal_resource_links)
+    (H5aSink *self, H5aHandle document);
+#endif
 } H5aSinkVTable;
 
 /* opaque */
@@ -325,8 +329,15 @@ extern const size_t k_h5a_parserSize;
 typedef struct H5aParserCreateInfo_s {
   char32_t (*input_get_char) (void *user_data);
   void *input_user_data;
+
   const H5aSinkVTable *sink_vtable;
   void *sink_user_data;
+
+  void *(*calloc_cb) (size_t n, size_t size);
+  void *(*realloc_cb) (void *ptr, size_t size);
+  void (*free_cb) (void *ptr);
+  void *(*memcpy_cb) (void *dest, void const *src, size_t n);
+
 } H5aParserCreateInfo;
 
 H5aResult h5aCreateParser (H5aParserCreateInfo const *create_info,

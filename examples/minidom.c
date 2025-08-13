@@ -118,6 +118,7 @@ typedef struct MdElement_s {
   MdNode element;
 
   void *qualname;
+  uint32_t tag_index;
   MdHandleVector(MdAttribute) attributes;
 } MdElement;
 
@@ -160,6 +161,8 @@ static void mdSinkParseError (H5aSink *self, char const *msg);
 [[nodiscard]] static H5aHandle mdSinkGetDocument (H5aSink *self);
 static void mdSinkSetQuirksMode (H5aSink *self, H5aQuirksMode mode);
 static bool mdSinkSameNode (H5aSink *self, H5aHandle x, H5aHandle y);
+static H5aHandle mdSinkCreateElement (H5aSink *self, H5aStringView name, H5aNamespace name_space,
+  uint32_t tag_index, H5aAttributeView const *attrs, size_t num_attrs);
 static H5aHandle mdSinkCreateComment (H5aSink *self, H5aStringView text);
 static void mdSinkAppend (H5aSink *self, H5aHandle parent, H5A_NODE_OR_TEXT_HANDLE(child));
 static void mdSinkAppendDoctypeToDocument (H5aSink *self, H5aStringView name,
@@ -243,9 +246,50 @@ static char const *k_html_tags_table[NUM_H5A_TAGS] = {
   [H5A_TAG_BR] = "br",
   [H5A_TAG_WBR] = "wbr",
 
-  /* ... */
+  [H5A_TAG_INS] = "ins",
+  [H5A_TAG_DEL] = "del",
 
-  
+  [H5A_TAG_PICTURE] = "picture",
+  [H5A_TAG_SOURCE] = "source",
+  [H5A_TAG_IMG] = "img",
+  [H5A_TAG_IFRAME] = "iframe",
+  [H5A_TAG_EMBED] = "embed",
+  [H5A_TAG_OBJECT] = "object",
+  [H5A_TAG_VIDEO] = "video",
+  [H5A_TAG_AUDIO] = "audio",
+  [H5A_TAG_TRACK] = "track",
+  [H5A_TAG_MAP] = "map",
+  [H5A_TAG_AREA] = "area",
+
+  [H5A_TAG_TABLE] = "table",
+  [H5A_TAG_CAPTION] = "caption",
+  [H5A_TAG_COLGROUP] = "colgroup",
+  [H5A_TAG_COL] = "col",
+  [H5A_TAG_TBODY] = "tbody",
+  [H5A_TAG_THEAD] = "thead",
+  [H5A_TAG_TFOOT] = "tfoot",
+  [H5A_TAG_TR] = "tr",
+  [H5A_TAG_TD] = "td",
+  [H5A_TAG_TH] = "th",
+
+  [H5A_TAG_FORM] = "form",
+  [H5A_TAG_LABEL] = "label",
+  [H5A_TAG_INPUT] = "input",
+  [H5A_TAG_BUTTON] = "button",
+  [H5A_TAG_SELECT] = "select",
+  [H5A_TAG_DATALIST] = "datalist",
+  [H5A_TAG_OPTGROUP] = "optgroup",
+  [H5A_TAG_OPTION] = "option",
+  [H5A_TAG_TEXTAREA] = "textarea",
+  [H5A_TAG_OUTPUT] = "output",
+  [H5A_TAG_PROGRESS] = "progress",
+  [H5A_TAG_METER] = "meter",
+  [H5A_TAG_FIELDSET] = "fieldset",
+  [H5A_TAG_LEGEND] = "legend",
+
+  [H5A_TAG_DETAILS] = "details",
+  [H5A_TAG_SUMMARY] = "summary",
+  [H5A_TAG_DIALOG] = "dialog",
 
   [H5A_TAG_SCRIPT]   = "script",
   [H5A_TAG_NOSCRIPT] = "noscript",
@@ -292,7 +336,7 @@ static const H5aSinkVTable k_minidom_sink_vtable = {
   .set_quirks_mode = mdSinkSetQuirksMode,
   .same_node = mdSinkSameNode,
   .elem_name = NULL,
-  .create_element = NULL,
+  .create_element = mdSinkCreateElement,
   .create_comment = mdSinkCreateComment,
   .append = mdSinkAppend,
   .append_before_sibling = NULL,
@@ -453,10 +497,15 @@ mdHandleWeakClone (MdHandle handle)
 static inline void
 mdHandleDestroy (MdHandle handle)
 {
-  if (--handle.control_block->ref_count == 0) {
+  auto ref_count = --handle.control_block->ref_count;
+
+  printf("refs left: %"PRIu32"\n", (uint32_t)(ref_count));
+
+  if (ref_count == 0) {
     handle.control_block->dtor(handle.instance);
     free(handle.control_block);
   }
+
 }
 
 
@@ -490,8 +539,10 @@ mdHandleVectorCreate (MdHandleVector *vec)
 static void
 mdHandleVectorDestroy (MdHandleVector *vec)
 {
-  for (size_t i = 0; i < vec->size; ++i)
+  for (size_t i = 0; i < vec->size; ++i) {
+    printf("hullo %zu\n", i);
     mdHandleDestroy(vec->data[i]);
+  }
   free(vec->data);
   vec->data = NULL;
   vec->size = 0;
@@ -606,6 +657,67 @@ mdDocument_dtor (void *user_data)
 
 
 static void
+mdAttribute_ctor (MdAttribute *attr, char const *name, char const *value)
+{
+  if (name != NULL)
+    attr->name = strdup(name);
+
+  if (value != NULL)
+    attr->value = strdup(value);
+}
+
+
+static void
+mdAttribute_dtor (void *user_data)
+{
+  MdAttribute *attr = user_data;
+
+  if (attr->name != NULL)
+    free(attr->name);
+
+  if (attr->value != NULL)
+    free(attr->value);
+}
+
+
+static void
+mdElement_ctor (MdElement *element, uint32_t tag_index)
+{
+  mdNode_ctor((MdNode *)(element), MD_NODETYPE_ELEMENT);
+
+  element->tag_index = tag_index;
+  element->qualname = NULL;
+  mdHandleVectorCreate(&element->attributes);
+}
+
+
+static void
+mdElement_dtor (void *user_data)
+{
+  MdElement *elem = user_data;
+
+  mdHandleVectorDestroy(&elem->attributes);
+
+  mdNode_dtor(user_data);
+}
+
+
+static void
+mdTemplateElement_ctor (MdTemplateElement *element, uint32_t tag_index)
+{
+  mdElement_ctor((MdElement *)(element), tag_index);
+}
+
+
+static void
+mdTemplateElement_dtor (void *user_data)
+{
+  (void) user_data;
+  abort();
+}
+
+
+static void
 mdSinkCreate (MdSink *sink)
 {
   sink->document = MD_ALLOC(Document);
@@ -685,6 +797,47 @@ mdSinkSameNode (H5aSink *self, H5aHandle x, H5aHandle y)
 
 
 H5A_SINK_CALLBACK_ATTR
+[[nodiscard]]
+static H5aHandle
+mdSinkCreateElement (H5aSink *self, H5aStringView name, H5aNamespace name_space,
+                     uint32_t tag_index, H5aAttributeView const *attrs, size_t num_attrs)
+{
+  (void) self;
+
+  if (tag_index == H5A_PLACEHOLDER_TAG)
+    die("unsupported tag: %s\n", name.data);
+
+  if (name_space != H5A_NAMESPACE_HTML)
+    die("bad namespace: %d\n", (int)(name_space));
+
+  MdHandle elem = { 0 };
+
+  switch (tag_index) {
+    case H5A_TAG_TEMPLATE: {
+      elem = MD_ALLOC(TemplateElement);
+      mdTemplateElement_ctor(elem.instance, tag_index);
+      break;
+    }
+
+    default: {
+      elem = MD_ALLOC(Element);
+      mdElement_ctor(elem.instance, tag_index);
+      break;
+    }
+  }
+
+  for (size_t i = 0; i < num_attrs; ++i) {
+    auto attr = MD_ALLOC(Attribute);
+    mdAttribute_ctor(attr.instance, attrs[i].name.data, attrs[i].value.data);
+
+    mdHandleVectorPush(&((MdElement *)(elem.instance))->attributes, attr);
+  }
+
+  return mdMdHandleToH5a(elem);
+}
+
+
+H5A_SINK_CALLBACK_ATTR
 static H5aHandle
 mdSinkCreateComment (H5aSink *self, H5aStringView text)
 {
@@ -706,8 +859,9 @@ H5A_SINK_CALLBACK_ATTR
 static void
 mdSinkAppend (H5aSink *self, H5aHandle parent, H5A_NODE_OR_TEXT_HANDLE(child))
 {
-  if (child_is_string)
+  if (child_is_string) {
     abort();
+  }
 
   auto parent_handle = mdH5aHandleToMd(parent);
   auto child_handle  = mdH5aHandleToMd(child.handle);
@@ -776,6 +930,15 @@ mdSinkGetTagByName (H5aSink *self, H5aStringView name)
      && strcmp(k_html_tags_table[t], name.data) == 0)
       return t;
 
+  if (strcmp("image", name.data) == 0)
+    return H5A_TAG_IMG;
+
+  if (strcmp("math", name.data) == 0)
+    die("MathML not supported yet\n");
+
+  if (strcmp("svg", name.data) == 0)
+    die("SVG not supported yet\n");
+
   return H5A_PLACEHOLDER_TAG;
 }
 
@@ -819,8 +982,14 @@ main (int argc, char *argv[])
   H5aParserCreateInfo parser_create_info = {
     .input_get_char = mdInputStreamGetChar,
     .input_user_data = (void *)(&stream),
+
     .sink_vtable = &k_minidom_sink_vtable,
     .sink_user_data = (H5aSink *)(&sink),
+
+    .calloc_cb = calloc,
+    .realloc_cb = realloc,
+    .free_cb = free,
+    .memcpy_cb = memcpy,
   };
 
   h5aCreateParser(&parser_create_info, parser);

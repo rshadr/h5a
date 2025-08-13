@@ -6,6 +6,8 @@
 ;;;; - string
 ;;;; - stack of insertion modes
 ;;;; - handle vector
+;;;; - attribute vector
+;;;; - attribute view vector
 ;;;;
 
 include 'macro/struct.inc'
@@ -15,12 +17,7 @@ include "local.inc"
 
 format ELF64
 
-extrn calloc
-extrn realloc
-extrn free
-extrn memcpy
-
-extrn grapheme_encode_utf8
+extrn h5aUTF8Encode
 
 
 section '.text' executable
@@ -30,6 +27,7 @@ section '.text' executable
 ;;;
 
 func _h5aVectorCreate, private
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<T> *vector
 ;; RSI : uint32_t initial_bytes
 ;; -> void
@@ -51,7 +49,7 @@ func _h5aVectorCreate, private
     mov edi, esi
     xor rsi,rsi
     inc esi
-    call calloc
+    call qword [r12 + H5aParser.calloc_cb]
 
     mov qword [rbx + H5aVector.data], rax
     jmp .finish
@@ -66,13 +64,14 @@ end func
 
 
 func _h5aVectorDestroy, private
+;; R12 : H5aParser *parser
 ;; RDI (arg): H5aVector<T> *vector
 ;; -> void
   with_saved_regs rbx
     mov rbx, rdi
 
     mov rdi, qword [rbx + H5aVector.data]
-    call free
+    call qword [r12 + H5aParser.free_cb]
 
     xor rax,rax
     mov qword [rbx + H5aVector.data], rax
@@ -84,6 +83,7 @@ end func
 
 
 func _h5aVectorMaybeGrow, private
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector *vector
 ;; RSI : uint32_t need_bytes
 ;; -> bool was_grown
@@ -106,7 +106,7 @@ func _h5aVectorMaybeGrow, private
     mov rdi, qword [rbx + H5aVector.data]
     xor rsi,rsi
     mov esi, ecx
-    call realloc
+    call qword [r12 + H5aParser.realloc_cb]
     mov qword [rbx + H5aVector.data], rax
 
     xor rax,rax
@@ -127,6 +127,7 @@ end func
 ;;;
 
 func _h5aStringCreate, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aString *string
 ;; -> void
   lea rdi, [rdi]
@@ -137,6 +138,7 @@ end func
 
 
 func _h5aStringDestroy, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aString *string
 ;; -> void
   lea rdi, [rdi]
@@ -145,6 +147,7 @@ end func
 
 
 func _h5aStringClear, public
+;; R12 : H5aParser *parser
 ;; RSI : H5aString *string
 ;; -> void
   mov rdx, rdi
@@ -156,6 +159,7 @@ end func
 
 
 func _h5aStringPushBackAscii, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aString *string
 ;; RSI : char8_t c
 ;; -> void
@@ -190,6 +194,7 @@ end func
 
 
 func _h5aStringPutChunk, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aString *string
 ;; RSI : char utf8[utf8_len]
 ;; RDX : size_t utf8_len
@@ -208,7 +213,7 @@ func _h5aStringPutChunk, public
     lea rdi, [rax + rcx * 1]
     mov rsi, r13
     mov rdx, r15
-    call memcpy
+    call qword [r12 + H5aParser.memcpy_cb]
 
     add dword [rbx + H5aString.size], r15d
   end with_saved_regs
@@ -217,6 +222,7 @@ end func
 
 
 func _h5aStringPushBackUnicode, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aString *string
 ;; RSI : char32_t c
 ;; -> void
@@ -230,7 +236,7 @@ func _h5aStringPushBackUnicode, public
     lea rsi, [rbp - 16]
     xor rdx,rdx
     mov dl, 16
-    call grapheme_encode_utf8
+    call h5aUTF8Encode
     mov rdx, rax
 
     mov rdi, rbx
@@ -249,6 +255,7 @@ end func
 ;;;
 
 func _h5aModeVectorCreate, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aInsertionMode> *vector
 ;; -> void
   lea rdi, [rdi]
@@ -259,6 +266,7 @@ end func
 
 
 func _h5aModeVectorDestroy, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aInsertionMode> *vector
 ;; -> void
   lea rdi, [rdi]
@@ -267,6 +275,7 @@ end func
 
 
 func _h5aModeVectorPushBack, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aInsertionMode> *vector
 ;; RSI : H5aInsertionMode mode
 ;; -> void
@@ -292,6 +301,7 @@ end func
 
 
 func _h5aModeVectorPopBack, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aInsertionMode> *vector
 ;; -> H5aInsertionMode mode
   mov    rsi, qword [rdi + H5aVector.data]
@@ -307,6 +317,7 @@ end func
 ;;;
 
 func _h5aElementVectorCreate, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aHandle> *vector
 ;; -> void
   with_stack_frame
@@ -353,6 +364,27 @@ func _h5aElementVectorDestroy, public
 end func
 
 
+func _h5aElementVectorPeekBack, public
+;; R12 : H5aParser *parser
+;; RDI : H5aVector<H5aHandle> *vector
+;; -> RAX:RDX : H5aHandle handle
+  unimplemented
+
+  mov rcx, qword [rdi + H5aVector.data]
+  xor rsi,rsi
+  mov esi, dword [rdi + H5aVector.size]
+  test esi,esi
+  jz .emptyStack
+
+  mov rax, qword [rcx + rsi + H5aHandle.x]
+  mov rdx, qword [rcx + rsi + H5aHandle.y]
+  ret
+
+.emptyStack:
+  unimplemented
+end func
+
+
 func _h5aElementVectorPushBack, public
 ;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aHandle> *vector
@@ -360,6 +392,7 @@ func _h5aElementVectorPushBack, public
 ;; -> void
 ;;; UNTESTED
   unimplemented
+
   with_saved_regs rbx, r13, r14
     mov rbx, rdi ;vector
 
@@ -387,12 +420,19 @@ func _h5aElementVectorPushBack, public
     mov dword [rbx + H5aVector.size], ecx
   end with_saved_regs
   ret
+
 end func
 
 
 func _h5aElementVectorPopBack, public
+;; R12 : H5aParser *parser
+;; RDI : H5aVector<H5aHandle> *vector
+;; -> RAX:RAX : H5aHandle handle
+
   unimplemented
+
   ; ...
+  ret
 end func
 
 
@@ -401,6 +441,7 @@ end func
 ;;;
 
 func _h5aAttrVectorCreate, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aAttribute> *vector
 ;; -> void
   with_saved_regs rbx, r13, r14
@@ -419,11 +460,11 @@ func _h5aAttrVectorCreate, public
     cmp r14, r13
     jae .after_loop
 
-    iterate member, Attribute.name,Attribute.value
+    iterate member, name,value
       mov rcx, r14
       shl rcx, (bsr sizeof.Attribute)
       mov rdx, qword [rbx + H5aVector.data]
-      lea rdi, [rdx + rcx + member]
+      lea rdi, [rdx + rcx + Attribute.#member]
       call _h5aStringCreate
     end iterate
 
@@ -436,6 +477,7 @@ end func
 
 
 func _h5aAttrVectorDestroy, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aAttribute> *vector
 ;; -> void
   with_saved_regs rbx, r13, r14
@@ -450,11 +492,11 @@ func _h5aAttrVectorDestroy, public
     cmp r14, r13
     jae .after_loop
 
-    iterate member, Attribute.name,Attribute.value
+    iterate member, name,value
       mov rcx, r14
       shl rcx, (bsr sizeof.Attribute)
       mov rdx, qword [rbx + H5aVector.data]
-      lea rdi, [rdx + rcx + member]
+      lea rdi, [rdx + rcx + Attribute.#member]
       call _h5aStringDestroy
     end iterate
 
@@ -469,6 +511,7 @@ end func
 
 
 func _h5aAttrVectorClear, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aAttribute> *vector
 ;; -> void
   with_saved_regs rbx, r13, r14
@@ -482,11 +525,11 @@ func _h5aAttrVectorClear, public
     cmp r14, r13
     jae .after_loop
 
-    iterate member, Attribute.name,Attribute.value
+    iterate member, name,value
       mov rcx, r14
       shl rcx, (bsr sizeof.Attribute)
       mov rdx, qword [rbx + H5aVector.data]
-      lea rdi, [rdx + rcx + member]
+      lea rdi, [rdx + rcx + Attribute.#member]
       call _h5aStringClear
     end iterate
 
@@ -499,6 +542,7 @@ end func
 
 
 func _h5aAttrVectorPushSlot, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aAttribute> *vector
 ;; -> H5aAttribute *slot
   with_saved_regs rbx
@@ -518,17 +562,17 @@ func _h5aAttrVectorPushSlot, public
       mov r14d, dword [rbx + H5aVector.size]
       shr r13, (bsr sizeof.Attribute)
       shr r14, (bsr sizeof.Attribute)
-      dec r14
+      ;dec r14 ;why this line??
 
 .loop:
       cmp r14, r13
       jae .after_loop
 
-      iterate member, Attribute.name,Attribute.value
+      iterate member, name,value
         mov rcx, r14
         shl rcx, (bsr sizeof.Attribute)
         mov rdx, qword [rbx + H5aVector.data]
-        lea rdi, [rdx + rcx + member]
+        lea rdi, [rdx + rcx + Attribute.#member]
         call _h5aStringCreate
       end iterate
 
@@ -540,11 +584,9 @@ func _h5aAttrVectorPushSlot, public
 
 .finish:
     xor rcx,rcx
-    inc dword [rbx + H5aVector.size]
+    add dword [rbx + H5aVector.size], sizeof.Attribute
     mov ecx, dword [rbx + H5aVector.size]
-    dec ecx
     mov rdx, qword [rbx + H5aVector.data]
-    shl ecx, (bsr sizeof.Attribute)
     lea rax, [rdx + rcx]
   end with_saved_regs
   ret
@@ -556,7 +598,8 @@ end func
 ;;;
 
 func _h5aAttrViewVectorCreate, public
-;; RDI : $
+;; R12 : H5aParser *parser
+;; RDI : H5aVector<H5aAttributeView> *vector
 ;; -> void
   with_saved_regs rbx
     mov rbx, rdi
@@ -571,7 +614,8 @@ end func
 
 
 func _h5aAttrViewVectorDestroy, public
-;; RDI : $
+;; R12 : H5aParser *parser
+;; RDI : H5aVector<H5aAttributeView> *vector
 ;; -> void
   with_saved_regs rbx
     mov rbx, rdi
@@ -584,7 +628,8 @@ end func
 
 
 func _h5aAttrViewVectorClear, public
-;; RDI : $
+;; R12 : H5aParser *parser
+;; RDI : H5aVector<H5aAttributeView> *vector
 ;; -> void
   with_saved_regs rbx
     mov rbx, rdi
@@ -598,6 +643,7 @@ end func
 
 
 func _h5aAttrViewVectorGenerate, public
+;; R12 : H5aParser *parser
 ;; RDI : H5aVector<H5aAttributeView> *vector
 ;; RSI : H5aVector<H5aAttribute> *source
 ;; -> void
@@ -627,9 +673,9 @@ func _h5aAttrViewVectorGenerate, public
     iterate member, name,value
       mov r10, qword [r8 + r9 + Attribute.#member + H5aString.data]
       mov qword [rdx + rax + H5aAttributeView.#member + H5aStringView.data], r10
-      xor r10,r10
-      mov r10d, dword [r8 + r9 + Attribute.#member + H5aString.size]
-      mov qword [rdx + rax + H5aAttributeView.#member + H5aStringView.size], r10
+      xor r11,r11
+      mov r11d, dword [r8 + r9 + Attribute.#member + H5aString.size]
+      mov qword [rdx + rax + H5aAttributeView.#member + H5aStringView.size], r11
     end iterate
 
     loop .loop

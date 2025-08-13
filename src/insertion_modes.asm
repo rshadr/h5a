@@ -16,6 +16,7 @@ extrn _h5aTreeBuilderAppendComment
 extrn _h5aTreeBuilderAppendCommentToDocument
 extrn _h5aTreeBuilderGenericRcdataParse
 extrn _h5aTreeBuilderGenericRawTextParse
+extrn _h5aModeVectorPopBack
 
 public _k_h5a_TreeBuilder_handlerTable
 
@@ -87,9 +88,9 @@ mode initial,INITIAL_MODE
 
         xor r9,r9
         xor r11,r11
-        mov al, byte [r13 + DoctypeToken.have_system_id]
-        test al,al
-        cmovnz r8, qword [r13 + DoctypeToken.system_id + H5aString.data]
+        mov r10b, byte [r13 + DoctypeToken.have_system_id]
+        test r10b,r10b
+        cmovnz r9, qword [r13 + DoctypeToken.system_id + H5aString.data]
         cmovnz r11d, dword [r13 + DoctypeToken.system_id + H5aString.size]
         xor rax,rax
         push rax
@@ -159,7 +160,40 @@ mode beforeHtml,BEFORE_HTML_MODE
 
   [[Start tag HTML]]
     with_stack_frame
-      ; ...
+      sub rsp, (2 * sizeof.H5aHandle)
+
+      mov rdi, qword [r12 + H5aParser.sink.user_data]
+      xor rsi,rsi
+      xor rdx,rdx
+      xor rcx,rcx ;H5A_NAMESPACE_HTML
+      xor r8,r8
+      mov r8b, H5A_TAG_HTML
+      xor r9,r9
+      push r9
+      call qword [r15 + H5aSinkVTable.create_element]
+      mov qword [rbp - 1 * 8], rax
+      mov qword [rbp - 2 * 8], rdx
+
+      mov rdi, qword [r12 + H5aParser.sink.user_data]
+      call qword [r15 + H5aSinkVTable.get_document]
+      mov qword [rbp - 3 * 8], rax
+      mov qword [rbp - 4 * 8], rdx
+
+      mov rdi, qword [r12 + H5aParser.sink.user_data]
+      mov rsi, qword [rbp - 3 * 8]
+      mov rdx, qword [rbp - 4 * 8]
+      mov rcx, qword [rbp - 1 * 8]
+      mov r8,  qword [rbp - 2 * 8]
+      xor r9,r9
+      call qword [r15 + H5aSinkVTable.append]
+
+      rept 2
+        mov rdi, qword [r12 + H5aParser.sink.user_data]
+        mov rsi, qword [rbp - (% + 0) * 8]
+        mov rcx, qword [rbp - (% + 1) * 8]
+        call qword [r15 + H5aSinkVTable.destroy_handle]
+      end rept
+
       mov byte [r12 + H5aParser.treebuilder.mode], BEFORE_HEAD_MODE
     end with_stack_frame
     xor al,al
@@ -280,7 +314,7 @@ mode inHead,IN_HEAD_MODE
     jmp _h5aTreeBuilderGenericRcdataParse
 
 
-namespace noscript_and_clique
+namespace inHead_noscript_and_clique
 
   [[Start tag NOSCRIPT]]
     ; XXX: test
@@ -607,7 +641,316 @@ mode inBody,IN_BODY_MODE
     xor al,al
     ret
 
-  ; ...
+  [[Start tag H1]]
+  [[Start tag H2]]
+  [[Start tag H3]]
+  [[Start tag H4]]
+  [[Start tag H5]]
+  [[Start tag H6]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag PRE]]
+  [[Start tag LISTING]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag FORM]]
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    ; ...
+    with_stack_frame
+      ; ...
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag LI]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag DD]]
+  [[Start tag DT]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag PLAINTEXT]]
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.tokenizer.state], PLAINTEXT_STATE
+    end with_stack_frame
+    xor al,al
+    ret
+
+  [[Start tag BUTTON]]
+    ; ...
+    xor al,al
+    ret
+
+  [[End tag ADDRESS]]
+  [[End tag ARTICLE]]
+  [[End tag ASIDE]]
+  [[End tag BLOCKQUOTE]]
+  [[End tag BUTTON]]
+  [[End tag CENTER]]
+  [[End tag DETAILS]]
+  [[End tag DIALOG]]
+  [[End tag DIR]]
+  [[End tag DIV]]
+  [[End tag DL]]
+  [[End tag FIELDSET]]
+  [[End tag FIGCAPTION]]
+  [[End tag FIGURE]]
+  [[End tag FOOTER]]
+  [[End tag HEADER]]
+  [[End tag HGROUP]]
+  [[End tag LISTING]]
+  [[End tag MAIN]]
+  [[End tag MENU]]
+  [[End tag NAV]]
+  [[End tag OL]]
+  [[End tag PRE]]
+  [[End tag SEARCH]]
+  [[End tag SECTION]]
+  [[End tag SUMMARY]]
+  [[End tag UL]]
+    ; ...
+    xor al,al
+    ret
+
+  [[End tag FORM]]
+    ; ...
+    xor al,al
+    ret
+
+  [[End tag P]]
+    ; ...
+    xor al,al
+    ret
+
+  [[End tag LI]]
+    ; ...
+    xor al,al
+    ret
+
+  [[End tag DD]]
+  [[End tag DT]]
+    ; ...
+    xor al,al
+    ret
+
+  [[End tag H1]]
+  [[End tag H2]]
+  [[End tag H3]]
+  [[End tag H4]]
+  [[End tag H5]]
+  [[End tag H6]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag A]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag B]]
+  [[Start tag BIG]]
+  [[Start tag CODE]]
+  [[Start tag EM]]
+  [[Start tag FONT]]
+  [[Start tag I]]
+  [[Start tag S]]
+  [[Start tag SMALL]]
+  [[Start tag STRIKE]]
+  [[Start tag STRONG]]
+  [[Start tag TT]]
+  [[Start tag U]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag NOBR]]
+    ; ...
+    xor al,al
+    ret
+
+  [[End tag A]]
+  [[End tag B]]
+  [[End tag BIG]]
+  [[End tag CODE]]
+  [[End tag EM]]
+  [[End tag FONT]]
+  [[End tag I]]
+  [[End tag S]]
+  [[End tag SMALL]]
+  [[End tag STRIKE]]
+  [[End tag STRONG]]
+  [[End tag TT]]
+  [[End tag U]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag APPLET]]
+  [[Start tag MARQUEE]]
+  [[Start tag OBJECT]]
+    ; ...
+    xor al,al
+    ret
+
+  [[End tag APPLET]]
+  [[End tag MARQUEE]]
+  [[End tag OBJECT]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag TABLE]]
+    ; ...
+    xor al,al
+    ret
+
+namespace br_and_clique
+  [[End tag BR]]
+    with_saved_regs rbx
+      mov rbx, rdi
+      ; ...
+      mov rdi, rbx
+    end with_saved_regs
+    jmp br_start_tag
+
+  [[Start tag AREA]]
+  [[Start tag BR]]
+  [[Start tag EMBED]]
+  [[Start tag IMG]]
+  [[Start tag KEYGEN]]
+  [[Start tag WBR]]
+br_start_tag:
+    ; ...
+    xor al,al
+    ret
+end namespace
+
+  [[Start tag INPUT]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag PARAM]]
+  [[Start tag SOURCE]]
+  [[Start tag TRACK]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag HR]]
+    ; ...
+    xor al,al
+    ret
+
+  ;; [[Start tag IMAGE]]
+
+  [[Start tag TEXTAREA]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag XMP]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag IFRAME]]
+    ; ...
+    xor al,al
+    ret
+
+namespace inBody_noscript_and_clique
+  [[Start tag NOSCRIPT]]
+    ; XXX: test scripting
+if 1
+    xor al,al
+    not al
+end if
+    test al,al
+    jz noscript_scripting_disabled
+    jmp noscript_scripting_enabled
+  [[Start tag NOEMBED]]
+noscript_scripting_enabled:
+    xor al,al
+    ret
+noscript_scripting_disabled:
+    unimplemented
+end namespace
+
+namespace inBody_select_startTag
+  [[Start tag SELECT]]
+    with_saved_regs rbx
+      unimplemented
+      mov rbx, rdi
+      ; ...
+
+      movzx rax, byte [r12 + H5aParser.tokenizer.state]
+      iterate mode, IN_TABLE,IN_CAPTION,IN_TABLE_BODY,IN_ROW,IN_CELL
+        cmp al, mode##_MODE
+        je need_change
+      end iterate
+      mov byte [r12 + H5aParser.tokenizer.state], IN_SELECT_MODE
+      jmp finish
+need_change:
+      mov byte [r12 + H5aParser.tokenizer.state], IN_SELECT_IN_TABLE_MODE
+finish:
+    end with_saved_regs
+    xor al,al
+    ret
+end namespace
+
+  [[Start tag OPTGROUP]]
+  [[Start tag OPTION]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag RB]]
+  [[Start tag RTC]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag RP]]
+  [[Start tag RT]]
+    ; ...
+    xor al,al
+    ret
+
+  ;[[Start tag MATH]]
+
+  ;[[Start tag SVG]]
+
+  [[Start tag CAPTION]]
+  [[Start tag COL]]
+  [[Start tag COLGROUP]]
+  [[Start tag FRAME]]
+  [[Start tag HEAD]]
+  [[Start tag TBODY]]
+  [[Start tag TD]]
+  [[Start tag TFOOT]]
+  [[Start tag TH]]
+  [[Start tag THEAD]]
+  [[Start tag TR]]
+    ; ...
+    mov al, RESULT_IGNORE
+    ret
 
   [[Any other start tag]]
     with_stack_frame
@@ -797,9 +1140,6 @@ mode inTable,IN_TABLE_MODE
 end mode
 
 
-; ...
-
-
 mode inTableText,IN_TABLE_TEXT_MODE
 
   [[Character U+0000]]
@@ -824,7 +1164,49 @@ mode inTableText,IN_TABLE_TEXT_MODE
 end mode
 
 
-; ...
+mode inCaption,IN_CAPTION_MODE
+
+  [[End tag CAPTION]]
+    ; ...
+    xor al,al
+    ret
+
+  [[Start tag CAPTION]]
+  [[Start tag COL]]
+  [[Start tag COLGROUP]]
+  [[Start tag TBODY]]
+  [[Start tag TD]]
+  [[Start tag TFOOT]]
+  [[Start tag TH]]
+  [[Start tag THEAD]]
+  [[Start tag TR]]
+  [[End tag TABLE]]
+    ; ...
+    with_stack_frame
+      ; ...
+      mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_MODE
+    end with_stack_frame
+    mov al, RESULT_REPROCESS
+    ret
+
+  [[End tag BODY]]
+  [[End tag COL]]
+  [[End tag COLGROUP]]
+  [[End tag HTML]]
+  [[End tag TBODY]]
+  [[End tag TD]]
+  [[End tag TFOOT]]
+  [[End tag TH]]
+  [[End tag THEAD]]
+  [[End tag TR]]
+    ; ...
+    mov al, RESULT_IGNORE
+    ret
+
+  [[Anything else]]
+    process_using_rules! IN_BODY_MODE
+
+end mode
 
 
 mode inColumnGroup,IN_COLUMN_GROUP_MODE
@@ -989,7 +1371,7 @@ mode inRow,IN_ROW_MODE
 end mode
 
 
-func close_cell, private
+func closeCell, private
   with_stack_frame
     ; ...
     mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
@@ -1044,6 +1426,7 @@ end mode
 
 
 mode inSelect,IN_SELECT_MODE
+
   [[Character U+0000]]
     with_stack_frame
       ; ...
@@ -1223,7 +1606,11 @@ mode inTemplate, IN_TEMPLATE_MODE
   [[Start tag TFOOT]]
   [[Start tag THEAD]]
     with_stack_frame
-      ; ...
+      mov rcx, qword [r12 + H5aParser.treebuilder.template_modes + H5aVector.data]
+      xor rdx,rdx
+      mov edx, dword [r12 + H5aParser.treebuilder.template_modes + H5aVector.size]
+      dec edx
+      mov byte [rcx + rdx], IN_TABLE_MODE
       mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_MODE
     end with_stack_frame
     mov al, RESULT_REPROCESS
@@ -1231,7 +1618,11 @@ mode inTemplate, IN_TEMPLATE_MODE
 
   [[Start tag COL]]
     with_stack_frame
-      ; ...
+      mov rcx, qword [r12 + H5aParser.treebuilder.template_modes + H5aVector.data]
+      xor rdx,rdx
+      mov edx, dword [r12 + H5aParser.treebuilder.template_modes + H5aVector.size]
+      dec edx
+      mov byte [rcx + rdx], IN_COLUMN_GROUP_MODE
       mov byte [r12 + H5aParser.treebuilder.mode], IN_COLUMN_GROUP_MODE
     end with_stack_frame
     mov al, RESULT_REPROCESS
@@ -1239,7 +1630,11 @@ mode inTemplate, IN_TEMPLATE_MODE
 
   [[Start tag TR]]
     with_stack_frame
-      ; ...
+      mov rcx, qword [r12 + H5aParser.treebuilder.template_modes + H5aVector.data]
+      xor rdx,rdx
+      mov edx, dword [r12 + H5aParser.treebuilder.template_modes + H5aVector.size]
+      dec edx
+      mov byte [rcx + rdx], IN_TABLE_BODY_MODE
       mov byte [r12 + H5aParser.treebuilder.mode], IN_TABLE_BODY_MODE
     end with_stack_frame
     mov al, RESULT_REPROCESS
@@ -1248,7 +1643,11 @@ mode inTemplate, IN_TEMPLATE_MODE
   [[Start tag TD]]
   [[Start tag TH]]
     with_stack_frame
-      ;...
+      mov rcx, qword [r12 + H5aParser.treebuilder.template_modes + H5aVector.data]
+      xor rdx,rdx
+      mov edx, dword [r12 + H5aParser.treebuilder.template_modes + H5aVector.size]
+      dec edx
+      mov byte [rcx + rdx], IN_ROW_MODE
       mov byte [r12 + H5aParser.treebuilder.mode], IN_ROW_MODE
     end with_stack_frame
     mov al, RESULT_REPROCESS
@@ -1256,7 +1655,11 @@ mode inTemplate, IN_TEMPLATE_MODE
 
   [[Any other start tag]]
     with_stack_frame
-      ; ...
+      mov rcx, qword [r12 + H5aParser.treebuilder.template_modes + H5aVector.data]
+      xor rdx,rdx
+      mov edx, dword [r12 + H5aParser.treebuilder.template_modes + H5aVector.size]
+      dec edx
+      mov byte [rcx + rdx], IN_BODY_MODE
       mov byte [r12 + H5aParser.treebuilder.mode], IN_BODY_MODE
     end with_stack_frame
     mov al, RESULT_REPROCESS
@@ -1277,6 +1680,9 @@ mode inTemplate, IN_TEMPLATE_MODE
     ; ...
     with_stack_frame
       ; ...
+      lea rdi, [r12 + H5aParser.treebuilder.template_modes]
+      call _h5aModeVectorPopBack
+      ; ...
     end with_stack_frame
     mov al, RESULT_REPROCESS
     ret
@@ -1293,6 +1699,7 @@ mode afterBody,AFTER_BODY_MODE
     process_using_rules! IN_BODY_MODE
 
   [[Comment]]
+    unimplemented
     ; ...
     xor al,al
     ret
@@ -1584,7 +1991,7 @@ mode inForeignContent,IN_FOREIGN_CONTENT_MODE
 end mode
 
 
-section '.rodata'
+section '.data.rel.ro'
   generate_tables
 
 ;; BUG: This is required because fasm otherwise refuses to emit relocations for the whole section??

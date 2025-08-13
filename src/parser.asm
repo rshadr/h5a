@@ -46,6 +46,15 @@ func h5aCreateParser, public
     mov r11, qword [r13 + H5aParserCreateInfo.sink_user_data]
     mov qword [r12 + H5aParser.sink.user_data], r11
 
+    mov rax, qword [r13 + H5aParserCreateInfo.calloc_cb]
+    mov qword [r12 + H5aParser.calloc_cb], rax
+    mov rcx, qword [r13 + H5aParserCreateInfo.realloc_cb]
+    mov qword [r12 + H5aParser.realloc_cb], rcx
+    mov rdx, qword [r13 + H5aParserCreateInfo.free_cb]
+    mov qword [r12 + H5aParser.free_cb], rdx
+    mov r11, qword [r13 + H5aParserCreateInfo.memcpy_cb]
+    mov qword [r12 + H5aParser.memcpy_cb], r11
+
     lea rdi, [r12 + H5aParser.tokenizer.input_buffer]
     call _h5aCharacterQueueConstruct
     lea rdi, [r12 + H5aParser.tokenizer.temp_buffer]

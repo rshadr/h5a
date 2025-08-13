@@ -20,11 +20,6 @@ include "local.inc"
 
 format ELF64
 
-extrn calloc
-extrn reallocarray
-extrn free
-extrn memcpy
-
 
 section '.rodata'
 _h5aCharacterQueue_init_capacity:
@@ -34,6 +29,7 @@ _h5aCharacterQueue_init_capacity:
 section '.text' executable
 
 func _h5aCharacterQueueConstruct, public
+;; R12: H5aParser *parser
 ;; RDI: H5aCharacterQueue *queue
   with_saved_regs rbx
     mov rbx, rdi
@@ -45,7 +41,7 @@ func _h5aCharacterQueueConstruct, public
     mov edi, dword [_h5aCharacterQueue_init_capacity]
     xor rsi,rsi
     mov sil, 4
-    call calloc
+    call qword [r12 + H5aParser.calloc_cb]
     ; XXX: check
     mov qword [rbx + H5aCharacterQueue.data], rax
 
@@ -63,7 +59,7 @@ func _h5aCharacterQueueDestroy, public
     mov rbx, rdi
 
     mov rdi, qword [rbx + H5aCharacterQueue.data]
-    call free
+    call qword [r12 + H5aParser.free_cb]
 
     zero_init rbx, sizeof.H5aCharacterQueue
   end with_saved_regs
@@ -88,7 +84,7 @@ func _h5aCharacterQueueGrow, public
     mov rdi, r13
     xor rsi,rsi
     mov sil, 4
-    call calloc
+    call qword [r12 + H5aParser.calloc_cb]
     mov r10, rax ;new_data
 
     ;; step 0: compute offsets
@@ -111,7 +107,7 @@ func _h5aCharacterQueueGrow, public
     lea rsi, [rsi + r15 * 4]
     mov rdx, r14
     shl rdx, 2
-    call memcpy
+    call qword [r12 + H5aParser.memcpy_cb]
 
     ;; step 3: bring secondary slice backward
     lea rdi, [r13 + r14 * 4]
@@ -120,11 +116,11 @@ func _h5aCharacterQueueGrow, public
     xor rdx,rdx
     mov edx, dword [rbx + H5aCharacterQueue.back_idx]
     shl rdx, 2
-    call memcpy
+    call qword [r12 + H5aParser.memcpy_cb]
 
     ;; step 4: cleanup
     mov rdi, qword [rbx + H5aCharacterQueue.data]
-    call free
+    call qword [r12 + H5aParser.free_cb]
     mov qword [rbx + H5aCharacterQueue.data], r13
 
     xor eax,eax

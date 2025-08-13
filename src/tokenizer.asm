@@ -307,13 +307,13 @@ func _h5aTokenizerEmitCharacter, public
   xor rsi,rsi
   mov sil, TOKEN_CHARACTER
 
-  cmp esi, 0x09
+  cmp edi, 0x09
   je .yes
-  cmp esi, 0x0A
+  cmp edi, 0x0A
   je .yes
-  cmp esi, 0x0C
+  cmp edi, 0x0C
   je .yes
-  cmp esi, 0x20
+  cmp edi, 0x20
   je .yes
 
 .no:

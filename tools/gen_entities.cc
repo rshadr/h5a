@@ -82,7 +82,7 @@ process (char const *src, size_t srclen)
          "\n"
          "format ELF64\n\n");
 
-  printf("section '.rodata'\n\n");
+  printf("section '.data.rel.ro'\n\n");
 
   printf("public _k_h5a_entityValues\n");
   printf("label _k_h5a_entityValues\n");

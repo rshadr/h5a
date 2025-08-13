@@ -2911,7 +2911,7 @@ end state
 
 
 
-section '.rodata'
+section '.data.rel.ro'
 generate_tables
 
 

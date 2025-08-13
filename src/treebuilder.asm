@@ -22,8 +22,6 @@ public _k_h5a_impliedTagsExt.size
 
 public _h5aTreeBuilderInsertCharacterBuffer
 public _h5aTreeBuilderInsertCharacter
-public _h5aTreeBuilderGenerateImpliedEndTags
-public _h5aTreeBuilderGenerateImpliedEndTagsExt
 public _h5aTreeBuilderAcceptToken
 
 
@@ -116,23 +114,46 @@ func _h5aTreeBuilderGenericRcdataParse, public
 end func
 
 
-_h5aTreeBuilderGenerateImpliedEndTags:
-;; R12 (s): H5aParser *parser
-;; RDI (EDI): Tag exclude
+func _h5aTreeBuilderCloseTagsCommon, private
+;; R12 : H5aParser *parser
+;; R15 : H5aSinkVTable *sink_vtable
+;; RDI : H5aTag exclude
+;; RSI : H5aTag *badguys
+;; RDX : size_t badguys_size
 ;; -> void
   with_stack_frame
-    ; ...
-  end with_stack_frame
-  ret
+    sub rsp, sizeof.H5aHandle
+  with_saved_regs rbx, r13, r14
+    mov rbx, rsi ;badguys
+    mov r13, rdx ;badguys_size
+    mov r14, rdi ;exclude
 
-_h5aTreeBuilderGenerateImpliedEndTagsExt:
+    ; ...
+  end with_saved_regs
+  end with_stack_frame
+  ret
+end func
+
+
+func _h5aTreeBuilderGenerateImpliedEndTags, public
 ;; R12 (s): H5aParser *parser
 ;; RDI (EDI): Tag exclude
 ;; -> void
-  with_stack_frame
-    ; ...
-  end with_stack_frame
-  ret
+  lea rsi, [_k_h5a_impliedTagsBasic]
+  movzx rdx, byte [_k_h5a_impliedTagsBasic.size]
+  jmp _h5aTreeBuilderCloseTagsCommon
+end func
+
+
+func _h5aTreeBuilderGenerateImpliedEndTagsExt, public
+;; R12 (s): H5aParser *parser
+;; RDI (EDI): Tag exclude
+;; -> void
+  lea rsi, [_k_h5a_impliedTagsExt]
+  movzx rdx, byte [_k_h5a_impliedTagsExt.size]
+  jmp _h5aTreeBuilderCloseTagsCommon
+end func
+
 
 _h5aTreeBuilderInsertCharacterBuffer:
 ;; R12 (s): H5aParser *parser

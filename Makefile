@@ -1,5 +1,5 @@
 ####
-#### Copyright 2024 rshadr
+#### Copyright 2024-2025 rshadr
 #### See LICENSE for details
 ####
 
@@ -18,6 +18,7 @@ SOURCES =\
 	tokenizer_states\
 	treebuilder\
 	unicode\
+	utf8\
 	vectors
 
 OBJS = $(patsubst %, build/%.o, $(SOURCES))
@@ -82,11 +83,11 @@ gen/entities.asm: ext/entities.json build/tools/gen_entities
 
 build/test/%: test/%.c build/libh5a.a
 	@mkdir -p $(@D)
-	$(CC) -o $@ -MMD $(CFLAGS) $< -L./build -lh5a -lgrapheme
+	$(CC) -o $@ -MMD -I./include $(CFLAGS) $< -L./build -lh5a -lgrapheme
 
 build/examples/%: examples/%.c build/libh5a.a
 	@mkdir -p $(@D)
-	$(CC) -o $@ -MMD $(CFLAGS) $< -L./build -lh5a -lgrapheme
+	$(CC) -o $@ -MMD -I./include $(CFLAGS) -fPIC $< -L./build -lh5a -lgrapheme
 
 clean:
 	rm -rf build
